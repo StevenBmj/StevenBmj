@@ -1,0 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom fade element transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes goldShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slowSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.15); }
+  50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.4); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(5%); }
+  50% { transform: translateX(-40%); }
+  100% { transform: translateX(5%); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-gold-shimmer {
+  background: linear-gradient(90deg, #0a0a0a 25%, #cb9b51 50%, #0a0a0a 75%);
+  background-size: 200% 100%;
+  animation: goldShimmer 3s infinite linear;
+}
+
+.animate-slow-spin {
+  animation: slowSpin 16s infinite linear;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 35s infinite linear;
+}
+
+/* Pure CSS 3D Depth Card Hover Effects */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.hover-3d-card {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s ease;
+  transform-style: preserve-3d;
+}
+
+.hover-3d-card:hover {
+  transform: translateY(-8px) rotateX(2deg) rotateY(-2deg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+/* Custom scrollbar to keep it perfectly integrated */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c1917;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
+
+/* High fidelity printing layout for invoice card */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area, #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: black !important;
+    color: white !important;
+  }
+  /* Hide print buttons and action noise */
+  #btn-print-invoice-complete, #btn-wa-invoice-redirect, #btn-close-checkout, footer, header {
+    display: none !important;
+  }
+}
+

@@ -1,0 +1,6 @@
+{
+  "name": "StevenBmj",
+  "description": "E-commerce haut de gamme et futuriste de montres, chaînes et vêtements homme premium.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
