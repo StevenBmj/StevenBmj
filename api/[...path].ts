@@ -142,7 +142,8 @@ export default async function handler(req: any, res: any) {
   try {
     const supabase = getSupabase();
     const url = new URL(req.url || '/', `https://${req.headers.host || 'localhost'}`);
-    const path = url.pathname.replace(/^\/api/, '') || '/';
+    const rewrittenPath = url.searchParams.get('path');
+    const path = rewrittenPath ? `/${rewrittenPath}` : (url.pathname.replace(/^\/api/, '') || '/');
     const method = req.method || 'GET';
 
     if (method === 'GET' && path === '/health') {
