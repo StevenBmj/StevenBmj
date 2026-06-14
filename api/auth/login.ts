@@ -14,6 +14,15 @@ function supabaseAdmin() {
   });
 }
 
+function supabaseAuthClient() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    return supabaseAdmin();
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 async function readBody(req: any) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
@@ -42,8 +51,9 @@ export default async function handler(req: any, res: any) {
     const password = String(body.password || '');
     if (!email || !password) return json(res, 400, { error: "L'adresse email et le mot de passe sont requis." });
 
+    const authClient = supabaseAuthClient();
     const supabase = supabaseAdmin();
-    const auth = await supabase.auth.signInWithPassword({ email, password });
+    const auth = await authClient.auth.signInWithPassword({ email, password });
     if (auth.error || !auth.data.user) return json(res, 401, { error: 'Identifiants incorrects.', details: auth.error?.message });
 
     const { data: profile, error } = await supabase.from('profiles').select('*').eq('email', email).maybeSingle();
