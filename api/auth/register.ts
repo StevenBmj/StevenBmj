@@ -1,6 +1,63 @@
-import { getProfileByEmail, json, publicUser, readBody, sendEmail, supabaseAdmin } from '../_supabase';
+import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase();
+
+function json(res: any, status: number, body: any) {
+  res.status(status).setHeader('content-type', 'application/json');
+  res.end(JSON.stringify(body));
+}
+
+function supabaseAdmin() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase environment variables are missing.');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function readBody(req: any) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  const raw = Buffer.concat(chunks).toString('utf-8');
+  return raw ? JSON.parse(raw) : {};
+}
+
+function publicUser(profile: any) {
+  return {
+    id: profile.id,
+    name: profile.name,
+    email: profile.email,
+    googleLinked: profile.google_linked,
+    vipPoints: profile.vip_points,
+    isAdmin: profile.is_admin,
+  };
+}
+
+async function sendActivationEmail(email: string, activationCode: string) {
+  try {
+    if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
+    const nodemailer = (await import('nodemailer')).default;
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_APP_PASSWORD },
+    });
+    await transporter.sendMail({
+      from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
+      to: email,
+      subject: 'Activation de votre compte Maison StevenBmj',
+      html: `<p>Votre code d'activation StevenBmj est :</p><h2>${activationCode}</h2>`,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default async function handler(req: any, res: any) {
   try {
@@ -13,7 +70,9 @@ export default async function handler(req: any, res: any) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "L'adresse e-mail n'est pas au format valide." });
 
     const supabase = supabaseAdmin();
-    if (await getProfileByEmail(supabase, email)) return json(res, 400, { error: 'Cette adresse e-mail est déjà enregistrée.' });
+    const existing = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data) return json(res, 400, { error: 'Cette adresse e-mail est déjà enregistrée.' });
 
     const isAdmin = email === ADMIN_EMAIL;
     const activationCode = isAdmin ? '' : Math.floor(100000 + Math.random() * 900000).toString();
@@ -40,11 +99,14 @@ export default async function handler(req: any, res: any) {
     const { error } = await supabase.from('profiles').insert(profile);
     if (error) throw error;
 
-    if (!isAdmin) {
-      await sendEmail(email, 'Activation de votre compte Maison StevenBmj', `<p>Votre code d'activation StevenBmj est :</p><h2>${activationCode}</h2>`);
-    }
-
-    return json(res, 200, { success: true, requiresActivation: !isAdmin, email, user: isAdmin ? publicUser(profile) : null });
+    const emailSent = isAdmin ? true : await sendActivationEmail(email, activationCode);
+    return json(res, 200, {
+      success: true,
+      requiresActivation: !isAdmin,
+      email,
+      emailSent,
+      user: isAdmin ? publicUser(profile) : null,
+    });
   } catch (error: any) {
     return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });
   }
