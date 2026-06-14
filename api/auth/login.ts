@@ -44,7 +44,7 @@ export default async function handler(req: any, res: any) {
 
     const supabase = supabaseAdmin();
     const auth = await supabase.auth.signInWithPassword({ email, password });
-    if (auth.error || !auth.data.user) return json(res, 401, { error: 'Identifiants incorrects.' });
+    if (auth.error || !auth.data.user) return json(res, 401, { error: 'Identifiants incorrects.', details: auth.error?.message });
 
     const { data: profile, error } = await supabase.from('profiles').select('*').eq('email', email).maybeSingle();
     if (error) throw error;
