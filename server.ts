@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
 import { INITIAL_PRODUCTS } from './src/data/products';
-import { Product, Order, PromoCode, AppSettings } from './src/types';
+import type { Product, Order, PromoCode, AppSettings } from './src/types';
 import {
   ensureAuthUser,
   findAuthUserByEmail,

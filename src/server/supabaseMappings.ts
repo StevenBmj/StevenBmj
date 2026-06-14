@@ -1,4 +1,4 @@
-import { Order, Product, PromoCode } from '../types';
+import type { Order, Product, PromoCode } from '../types';
 
 export function productToRow(product: Product) {
   return {
