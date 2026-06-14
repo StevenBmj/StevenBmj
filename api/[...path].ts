@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import nodemailer from 'nodemailer';
-import { GoogleGenAI } from '@google/genai';
 import {
   announcementToRow,
   orderToRow,
@@ -53,6 +51,7 @@ async function findAuthUserByEmail(supabase: any, email: string) {
 
 async function sendEmail(to: string, subject: string, html: string) {
   if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
+  const nodemailer = (await import('nodemailer')).default;
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
@@ -121,6 +120,7 @@ async function handleGemini(req: any, res: any, supabase: any) {
   }
 
   try {
+    const { GoogleGenAI } = await import('@google/genai');
     const { data: products } = await supabase.from('products').select('*').limit(30);
     const catalogue = (products || []).map(rowToProduct).map((p) => `${p.name}: ${p.price} EUR`).join('\n');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
