@@ -1,4 +1,18 @@
-import { json, supabaseAdmin } from './_supabase';
+import { createClient } from '@supabase/supabase-js';
+
+function json(res: any, status: number, body: any) {
+  res.status(status).setHeader('content-type', 'application/json');
+  res.end(JSON.stringify(body));
+}
+
+function supabaseAdmin() {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase environment variables are missing.');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 function rowToProduct(row: any) {
   return {
