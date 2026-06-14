@@ -10,8 +10,8 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
-import { INITIAL_PRODUCTS } from './src/data/products.js';
-import { Product, Order, PromoCode, AppSettings } from './src/types.js';
+import { INITIAL_PRODUCTS } from './src/data/products';
+import { Product, Order, PromoCode, AppSettings } from './src/types';
 import {
   ensureAuthUser,
   findAuthUserByEmail,
@@ -20,7 +20,7 @@ import {
   loadStoreFromSupabase,
   saveStoreToSupabase,
   upsertProfile,
-} from './src/server/supabaseStore.js';
+} from './src/server/supabaseStore';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config();
@@ -77,6 +77,14 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // Enable JSON bodies with higher limits for luxury asset uploads
 app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    supabase: hasSupabaseConfig(),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Initial State Setup
 const DB_FILE = path.join(process.cwd(), 'db_store.json');
