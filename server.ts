@@ -8,7 +8,6 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 import { INITIAL_PRODUCTS } from './src/data/products';
 import { Product, Order, PromoCode, AppSettings } from './src/types';
@@ -1509,6 +1508,7 @@ app.post('/api/gemini/chat', rateLimitMiddleware, async (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     // Dev with Vite integration
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
