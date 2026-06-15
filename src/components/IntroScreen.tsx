@@ -24,15 +24,15 @@ export default function IntroScreen({ onComplete, language }: IntroScreenProps) 
     // Staggered text change
     const interval = setInterval(() => {
       setSubTextIndex(prev => (prev + 1) % subTexts.length);
-    }, 1200);
+    }, 900);
 
-    // End introduction after 4.8 seconds
+    // Keep the cinematic moment short so refreshes feel fast.
     const timer = setTimeout(() => {
       setStartTransition(true);
       setTimeout(() => {
         onComplete();
-      }, 800);
-    }, 4500);
+      }, 450);
+    }, 2200);
 
     return () => {
       clearInterval(interval);
@@ -61,7 +61,7 @@ export default function IntroScreen({ onComplete, language }: IntroScreenProps) 
             <motion.div
               className="absolute -inset-10 rounded-full border border-yellow-600/10 pointer-events-none"
               animate={{ rotate: 360, scale: [1, 1.05, 1] }}
-              transition={{ repeat: Infinity, duration: 12, ease: "linear" }}
+              transition={{ repeat: Infinity, duration: 16, ease: "linear" }}
             />
 
             {/* The Monogram */}

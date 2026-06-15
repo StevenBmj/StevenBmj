@@ -1,0 +1,17 @@
+{
+  "name": "StevenBmj",
+  "short_name": "StevenBmj",
+  "description": "Haute horlogerie, joaillerie, couture et accessoires de prestige StevenBmj.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/stevenbmj-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

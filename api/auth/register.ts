@@ -97,7 +97,10 @@ export default async function handler(req: any, res: any) {
       date_joined: new Date().toISOString(),
     };
     const { error } = await supabase.from('profiles').insert(profile);
-    if (error) throw error;
+    if (error) {
+      await supabase.auth.admin.deleteUser(auth.data.user.id);
+      throw error;
+    }
 
     const emailSent = isAdmin ? true : await sendActivationEmail(email, activationCode);
     return json(res, 200, {

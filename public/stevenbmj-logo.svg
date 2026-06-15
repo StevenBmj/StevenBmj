@@ -1,0 +1,37 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">StevenBmj gold monogram logo</title>
+  <desc id="desc">A luxury gold S monogram in a double circular seal.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="44%" r="70%">
+      <stop offset="0" stop-color="#fff4b8"/>
+      <stop offset="0.22" stop-color="#d9a936"/>
+      <stop offset="0.52" stop-color="#8b6b2f"/>
+      <stop offset="0.78" stop-color="#5f573e"/>
+      <stop offset="1" stop-color="#b49a63"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="175" y1="100" x2="825" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7b4f08"/>
+      <stop offset="0.14" stop-color="#fff0a8"/>
+      <stop offset="0.3" stop-color="#c58a19"/>
+      <stop offset="0.47" stop-color="#fff6bd"/>
+      <stop offset="0.66" stop-color="#d9a633"/>
+      <stop offset="0.82" stop-color="#fff2a6"/>
+      <stop offset="1" stop-color="#7d520b"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#140b00" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="-3" stdDeviation="4" flood-color="#fff3a6" flood-opacity="0.35"/>
+    </filter>
+    <filter id="inner" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="1.6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="378" stroke="#2f1b04" stroke-width="7" opacity="0.85"/>
+  <circle cx="512" cy="512" r="356" stroke="url(#gold)" stroke-width="24" filter="url(#shadow)"/>
+  <circle cx="512" cy="512" r="329" stroke="#2c1803" stroke-width="6" opacity="0.9"/>
+  <path d="M636 226v104h-45c-6-50-39-79-91-79-56 0-92 31-92 78 0 44 31 68 113 103 112 48 166 107 166 202 0 111-82 185-205 185-74 0-136-24-180-69V612h48c8 77 59 124 134 124 66 0 108-37 108-94 0-51-35-80-122-118-105-46-154-101-154-187 0-103 80-174 196-174 50 0 91 13 124 63Z" fill="url(#gold)" stroke="#2d1904" stroke-width="7" stroke-linejoin="round" filter="url(#shadow)"/>
+  <path d="M470 295h126v58h-37v283c0 88-45 139-122 139-57 0-98-32-107-86h67c7 23 22 35 43 35 31 0 47-25 47-76V353h-17v-58Z" fill="url(#gold)" stroke="#2d1904" stroke-width="7" stroke-linejoin="round" filter="url(#inner)"/>
+  <circle cx="432" cy="690" r="36" fill="url(#gold)" stroke="#2d1904" stroke-width="6"/>
+</svg>

@@ -57,7 +57,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [cartOpen, setCartOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [vipPoints, setVipPoints] = useState(0);
-  const [hasIntroPlayed, setHasIntroPlayed] = useState(false);
+  const [hasIntroPlayed, setHasIntroPlayed] = useState(() => localStorage.getItem('sbmj_intro_played') === 'true');
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<any | null>(null);
@@ -260,6 +260,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSetIntroPlayed = (played: boolean) => {
     setHasIntroPlayed(played);
+    if (played) {
+      localStorage.setItem('sbmj_intro_played', 'true');
+    }
   };
 
   const setUser = (u: any | null) => {
