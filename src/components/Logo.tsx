@@ -13,7 +13,7 @@ interface LogoProps {
   id?: string;
 }
 
-const LOGO_SRC = '/stevenbmj-logo.svg';
+const LOGO_SRC = '/logo.png';
 
 function Logo({ className = '', size = 120, animated = false, id }: LogoProps) {
   const style = {

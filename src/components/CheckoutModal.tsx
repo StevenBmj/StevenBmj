@@ -236,31 +236,7 @@ ${itemsText}
           <div class="print-container">
             <div class="flex justify-between items-center border-b border-yellow-500/30 pb-6 mb-6">
               <div class="flex items-center space-x-3">
-                <svg viewBox="0 0 500 500" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="gold-metal-primary" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#FAF1C5" />
-                      <stop offset="25%" stop-color="#DFBA6B" />
-                      <stop offset="50%" stop-color="#C29D45" />
-                      <stop offset="75%" stop-color="#EAD293" />
-                      <stop offset="100%" stop-color="#8A641A" />
-                    </linearGradient>
-                    <linearGradient id="gold-stroke" x1="0%" y1="100%" x2="100%" y2="0%">
-                      <stop offset="0%" stop-color="#9E7C2A" />
-                      <stop offset="30%" stop-color="#F9E8AA" />
-                      <stop offset="50%" stop-color="#B69137" />
-                      <stop offset="70%" stop-color="#FFF1BE" />
-                      <stop offset="100%" stop-color="#7E5F1E" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="250" cy="250" r="228" stroke="url(#gold-stroke)" stroke-width="6" />
-                  <circle cx="250" cy="250" r="215" stroke="url(#gold-stroke)" stroke-width="2" opacity="0.8" />
-                  <g>
-                    <path d="M 315 150 C 315 110, 240 100, 210 135 C 180 170, 200 215, 255 235 C 310 255, 335 300, 305 345 C 275 390, 195 385, 190 330 L 205 330 C 210 370, 270 375, 290 340 C 310 305, 290 270, 240 250 C 190 230, 165 185, 195 140 C 225 95, 300 100, 310 148 Z" fill="url(#gold-metal-primary)" />
-                    <path d="M 230 140 L 290 140 L 290 152 L 266 152 L 266 330 C 266 375, 210 370, 210 338 L 223 338 C 223 358, 253 358, 253 330 L 253 152 L 230 152 Z" fill="url(#gold-metal-primary)" />
-                    <circle cx="216.5" cy="338" r="7" fill="url(#gold-metal-primary)" />
-                  </g>
-                </svg>
+                <img src="/logo.png" alt="StevenBmj" width="60" height="60" style="width:60px;height:60px;border-radius:9999px;object-fit:cover;" />
                 <div style="text-align: left; margin-left: 10px;">
                   <div style="font-size: 24px; color: #fbbf24; font-weight: 300; letter-spacing: 0.25em; font-family: sans-serif; text-transform: uppercase; line-height: 1;">StevenBmj</div>
                   <div style="font-size: 7px; color: #a3a3a3; font-weight: 600; letter-spacing: 0.35em; font-family: monospace; text-transform: uppercase; margin-top: 3px;">HAUTE COUTURE & JOAILLERIE</div>
