@@ -2,6 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase();
 
+function isValidPersonName(value: string) {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}$/.test(value.trim()) && !/\d/.test(value);
+}
+
 function json(res: any, status: number, body: any) {
   res.status(status).setHeader('content-type', 'application/json');
   res.end(JSON.stringify(body));
@@ -68,6 +72,8 @@ export default async function handler(req: any, res: any) {
     const password = String(body.password || '');
     if (!name || !email || !password) return json(res, 400, { error: 'Tous les champs sont requis.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "L'adresse e-mail n'est pas au format valide." });
+    if (!isValidPersonName(name)) return json(res, 400, { error: 'Le nom et le prenom ne doivent contenir que des lettres, espaces, apostrophes ou tirets.' });
+    if (password.length < 8) return json(res, 400, { error: 'Le mot de passe doit contenir au moins 8 caracteres.' });
 
     const supabase = supabaseAdmin();
     const existing = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
@@ -103,11 +109,17 @@ export default async function handler(req: any, res: any) {
     }
 
     const emailSent = isAdmin ? true : await sendActivationEmail(email, activationCode);
+    if (!emailSent) {
+      await supabase.from('profiles').delete().eq('email', email);
+      await supabase.auth.admin.deleteUser(auth.data.user.id);
+      return json(res, 500, { error: "Impossible d'envoyer le code d'activation par e-mail. Verifiez la configuration SMTP puis reessayez." });
+    }
     return json(res, 200, {
       success: true,
       requiresActivation: !isAdmin,
       email,
       emailSent,
+      message: !isAdmin ? "Un code est envoye a votre adresse mail. Entrez-le pour finaliser votre compte." : undefined,
       user: isAdmin ? publicUser(profile) : null,
     });
   } catch (error: any) {

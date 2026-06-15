@@ -43,6 +43,10 @@ export default function AuthModal() {
       setGoogleAddError(language === 'FR' ? "Tous les champs sont requis." : "All fields are required.");
       return;
     }
+    if (/\d/.test(newGoogleName)) {
+      setGoogleAddError(language === 'FR' ? "Le nom ne doit pas contenir de chiffres." : "The name cannot contain numbers.");
+      return;
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newGoogleEmail.trim().toLowerCase())) {
       setGoogleAddError(language === 'FR' ? "Format d'adresse e-mail invalide." : "Invalid email format.");
@@ -337,8 +341,8 @@ export default function AuthModal() {
                   <div className="p-3.5 bg-neutral-900 border border-amber-500/20 rounded text-center">
                     <p className="text-[11px] font-mono text-amber-500 uppercase tracking-widest leading-relaxed whitespace-pre-line">
                       {language === 'FR' 
-                        ? `✓ Code confidentiel transmis à :\n${activationEmail || email}` 
-                        : `✓ Security code sent to:\n${activationEmail || email}`}
+                        ? `Un code est envoye a votre adresse mail :\n${activationEmail || email}` 
+                        : `A code has been sent to your email address:\n${activationEmail || email}`}
                     </p>
                   </div>
 
@@ -398,8 +402,10 @@ export default function AuthModal() {
                           id="auth-input-fullname"
                           type="text"
                           required
+                          pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                          title={language === 'FR' ? "Le nom et le prenom ne doivent pas contenir de chiffres." : "The first and last name cannot contain numbers."}
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
+                          onChange={(e) => setFullName(e.target.value.replace(/\d/g, ''))}
                           placeholder="Steven Amorin"
                           className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-3.5 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none placeholder-neutral-700"
                         />
@@ -427,7 +433,9 @@ export default function AuthModal() {
 
                   <div className="space-y-1 text-left animate-fade-in">
                     <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
-                      {language === 'FR' ? "Code Secret d'Attribution *" : "Secure Lock Pass Code *"}
+                      {mode === 'login'
+                        ? (language === 'FR' ? "Mot de passe *" : "Password *")
+                        : (language === 'FR' ? "Creer votre mot de passe *" : "Create your password *")}
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-neutral-600" />
@@ -435,6 +443,7 @@ export default function AuthModal() {
                         id="auth-input-password"
                         type="password"
                         required
+                        minLength={8}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"

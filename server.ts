@@ -71,6 +71,14 @@ async function sendCoutureEmail(to: string, subject: string, htmlContent: string
   }
 }
 
+function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim().toLowerCase());
+}
+
+function isValidPersonName(value: string) {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}$/.test(value.trim()) && !/\d/.test(value);
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -787,12 +795,18 @@ app.post('/api/auth/register', async (req, res) => {
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Tous les champs sont requis." });
   }
+  const cleanName = String(name).trim();
   const emailKey = email.trim().toLowerCase();
   
   // Strict email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(emailKey)) {
+  if (!isValidEmailAddress(emailKey)) {
     return res.status(400).json({ error: "L'adresse e-mail n'est pas au format valide (ex: client@elite.com)." });
+  }
+  if (!isValidPersonName(cleanName)) {
+    return res.status(400).json({ error: "Le nom et le prenom ne doivent contenir que des lettres, espaces, apostrophes ou tirets." });
+  }
+  if (String(password).length < 8) {
+    return res.status(400).json({ error: "Le mot de passe doit contenir au moins 8 caracteres." });
   }
 
   const existing = dbStore.users.find((u: any) => u.email.toLowerCase() === emailKey);
@@ -812,7 +826,7 @@ app.post('/api/auth/register', async (req, res) => {
       const authUser = await ensureAuthUser(supabase, {
         email: email.trim(),
         password,
-        name: name.trim(),
+        name: cleanName,
         emailConfirm: true,
       });
       authUserId = authUser.id;
@@ -823,7 +837,7 @@ app.post('/api/auth/register', async (req, res) => {
 
   const newUser = {
     id: authUserId,
-    name: name.trim(),
+    name: cleanName,
     email: email.trim(),
     password: password,
     googleLinked: false,
@@ -850,7 +864,7 @@ app.post('/api/auth/register', async (req, res) => {
     const subject = "Activation de votre compte Maison StevenBmj";
     const bodyPrat = `
       <p style="font-size: 15px; color: #cca43b; font-weight: bold; margin-bottom: 20px;">BIENVENUE CHEZ MAISON STEVENBMJ</p>
-      <p>M. / Mme. <strong>${name.trim()}</strong>,</p>
+      <p>M. / Mme. <strong>${cleanName}</strong>,</p>
       <p>Votre compte client de prestige a été initié. Afin de l'activer, de le rendre fonctionnel et de vous autoriser à effectuer des acquisitions de haute couture ou d'horlogerie, veuillez renseigner le document de certification ci-dessous dans votre application :</p>
       <div style="background-color: #0b0b0b; border: 1px solid #cca43b; font-family: monospace; font-size: 26px; font-weight: bold; text-align: center; color: #ffffff; padding: 22px; margin: 25px 0; letter-spacing: 0.3em; border-radius: 4px;">
         ${activationCode}
@@ -859,13 +873,27 @@ app.post('/api/auth/register', async (req, res) => {
       <p style="margin-top: 35px;">Cordialement,</p>
       <p><strong>Le Bureau de Validation</strong><br/>StevenBmj Paris - Cotonou</p>
     `;
-    sendCoutureEmail(email.trim(), subject, bodyPrat);
+    const emailSent = await sendCoutureEmail(email.trim(), subject, bodyPrat);
+    if (!emailSent) {
+      dbStore.users = dbStore.users.filter((u: any) => u.email.toLowerCase() !== emailKey);
+      if (supabase) {
+        await deleteSupabaseRows('profiles', 'email', emailKey);
+        try {
+          await supabase.auth.admin.deleteUser(authUserId);
+        } catch (error) {
+          console.error("Error rolling back Supabase auth user after email failure", error);
+        }
+      }
+      saveDb();
+      return res.status(500).json({ error: "Impossible d'envoyer le code d'activation par e-mail. Verifiez la configuration SMTP puis reessayez." });
+    }
   }
 
   res.json({ 
     success: true, 
     requiresActivation: !isSecuredAdmin,
     email: newUser.email,
+    message: !isSecuredAdmin ? "Un code est envoye a votre adresse mail. Entrez-le pour finaliser votre compte." : undefined,
     user: isSecuredAdmin ? { 
       id: newUser.id, 
       name: newUser.name, 
