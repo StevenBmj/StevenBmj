@@ -95,11 +95,16 @@ create table if not exists public.profiles (
   is_admin boolean not null default false,
   is_confirmed boolean not null default false,
   activation_code text not null default '',
+  activation_expires_at timestamptz,
   reset_code text not null default '',
+  reset_expires_at timestamptz,
   date_joined timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists activation_expires_at timestamptz;
+alter table public.profiles add column if not exists reset_expires_at timestamptz;
 
 create or replace function public.set_updated_at()
 returns trigger as $$

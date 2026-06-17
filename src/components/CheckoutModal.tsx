@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
-import { ShieldCheck, Truck, Check, HelpCircle, Phone, FileText, Printer, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Truck, Check, HelpCircle, Phone, FileText, ArrowRight } from 'lucide-react';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -115,14 +115,14 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName || !whatsapp || !address || !city) return;
+    if (!customerName || !whatsapp || !email || !address || !city) return;
 
     setIsSubmitting(true);
 
     const orderPayload = {
       customerName,
       whatsapp,
-      email: email || `${customerName.toLowerCase().replace(/\s+/g, '')}@gmail.com`, // fallback if empty
+      email,
       address,
       city,
       notes: notes + (promoCodeInput && activeDiscount > 0 ? ` (Code Promo: ${promoCodeInput.toUpperCase()} -${activeDiscount}%)` : ''),
@@ -196,6 +196,41 @@ ${itemsText}
     
     // Redirect now
     window.open(waUrl, '_blank');
+  };
+
+  const handleDownloadInvoiceAndWhatsApp = () => {
+    if (!completedOrder) return;
+    const rows = completedOrder.items.map((item: any) => {
+      const size = item.selectedSize ? ` - Taille: ${item.selectedSize}` : '';
+      return `<tr><td>${item.quantity}x ${item.productName}${size}</td><td style="text-align:right">${formatPrice(item.price * item.quantity)}</td></tr>`;
+    }).join('');
+    const html = `<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Facture StevenBmj ${completedOrder.id}</title></head>
+<body style="font-family:Arial,sans-serif;background:#050505;color:#fff;padding:32px">
+  <main style="max-width:760px;margin:auto;border:2px solid #d97706;padding:28px">
+    <h1 style="color:#fbbf24;letter-spacing:.18em">STEVENBMJ</h1>
+    <h2>Facture ${completedOrder.id}</h2>
+    <p>Date: ${new Date(completedOrder.date).toLocaleString('fr-FR')}</p>
+    <p>Client: ${completedOrder.customerName}</p>
+    <p>Email: ${completedOrder.email || email}</p>
+    <p>WhatsApp: ${completedOrder.whatsapp}</p>
+    <p>Livraison: ${completedOrder.address}, ${completedOrder.city}</p>
+    <table style="width:100%;border-collapse:collapse;margin-top:24px">${rows}</table>
+    <h2 style="text-align:right;color:#fbbf24">Total: ${formatPrice(completedOrder.totalPrice)}</h2>
+  </main>
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `facture-stevenbmj-${completedOrder.id}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    window.setTimeout(handleWhatsAppRedirect, 900);
   };
 
   const handlePrintInvoice = () => {
@@ -369,7 +404,9 @@ ${itemsText}
                     type="text"
                     required
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => setCustomerName(e.target.value.replace(/\d/g, ''))}
+                    pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                    title={language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.'}
                     placeholder="M. Steven Bio"
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white focus:outline-none focus:border-amber-400 rounded focus:ring-1 focus:ring-amber-500/10"
                   />
@@ -707,11 +744,11 @@ ${itemsText}
               
               <button
                 id="btn-print-invoice-complete"
-                onClick={handlePrintInvoice}
+                onClick={handleDownloadInvoiceAndWhatsApp}
                 className="px-6 h-12 border border-white/20 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded text-xs font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
               >
-                <Printer className="w-4 h-4" />
-                <span>{language === 'FR' ? 'Imprimer / Télécharger Facture' : 'Print / Download Invoice'}</span>
+                <FileText className="w-4 h-4" />
+                <span>{language === 'FR' ? 'Telecharger facture puis WhatsApp' : 'Download invoice then WhatsApp'}</span>
               </button>
 
               <button

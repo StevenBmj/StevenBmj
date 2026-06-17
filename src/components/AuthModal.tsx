@@ -4,6 +4,19 @@ import { X, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle } from 'lucide-
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: any) => void;
+          prompt: (callback?: (notification: any) => void) => void;
+        };
+      };
+    };
+  }
+}
+
 export default function AuthModal() {
   const { 
     language, 
@@ -25,10 +38,8 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false);
   const [showGoogleSim, setShowGoogleSim] = useState(false);
 
-  // Simulate Google Account Auth Options starting with browser's default email
-  const [googleAccounts, setGoogleAccounts] = useState([
-    { name: "Steven Elite", email: "007killerhunter007@gmail.com", avatar: "SE" }
-  ]);
+  const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+  const [googleAccounts, setGoogleAccounts] = useState<any[]>([]);
   const [newGoogleName, setNewGoogleName] = useState('');
   const [newGoogleEmail, setNewGoogleEmail] = useState('');
   const [isAddingGoogle, setIsAddingGoogle] = useState(false);
@@ -135,14 +146,14 @@ export default function AuthModal() {
     }
   };
 
-  const handleGoogleSelect = async (gAcc: typeof googleAccounts[0]) => {
+  const handleGoogleCredential = async (credential: string) => {
     setError('');
     setLoading(true);
     try {
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: gAcc.email, name: gAcc.name })
+        body: JSON.stringify({ credential })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -158,6 +169,65 @@ export default function AuthModal() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const startGoogleSignIn = () => {
+    setError('');
+    if (!googleClientId) {
+      setError(language === 'FR'
+        ? "Google réel n'est pas encore configuré. Ajoutez VITE_GOOGLE_CLIENT_ID et GOOGLE_CLIENT_ID dans Vercel pour proposer les comptes Google de l'appareil."
+        : "Real Google Sign-In is not configured yet. Add VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID in Vercel to show the device Google accounts."
+      );
+      return;
+    }
+
+    const openPrompt = () => {
+      window.google?.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response: any) => {
+          if (response?.credential) handleGoogleCredential(response.credential);
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      window.google?.accounts.id.prompt((notification: any) => {
+        if (notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.()) {
+          setError(language === 'FR'
+            ? "Google n'a pas pu afficher le sélecteur de comptes. Vérifiez que les popups/cookies Google sont autorisés."
+            : "Google could not show the account picker. Check that Google popups/cookies are allowed."
+          );
+        }
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      openPrompt();
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener('load', openPrompt, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = openPrompt;
+    script.onerror = () => setError(language === 'FR'
+      ? "Impossible de charger Google Auth. Vérifiez la connexion réseau."
+      : "Unable to load Google Auth. Please check the network connection."
+    );
+    document.head.appendChild(script);
+  };
+
+  const handleGoogleSelect = async (_account?: any) => {
+    setError(language === 'FR'
+      ? "Les comptes Google fictifs ont été supprimés. Utilisez le bouton Google réel."
+      : "Fake Google accounts have been removed. Use real Google Sign-In."
+    );
   };
 
   return (
@@ -354,10 +424,10 @@ export default function AuthModal() {
                       id="activation-input-code"
                       type="text"
                       required
-                      maxLength={8}
+                      maxLength={6}
                       value={activationCode}
-                      onChange={(e) => setActivationCode(e.target.value)}
-                      placeholder="123456"
+                      onChange={(e) => setActivationCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                      placeholder="A7B9K2"
                       className="w-full bg-neutral-900 border border-amber-500/30 text-center tracking-[0.4em] font-bold text-lg py-3.5 text-white rounded focus:border-amber-400 focus:outline-none placeholder-neutral-700 font-mono"
                     />
                   </div>
@@ -481,7 +551,7 @@ export default function AuthModal() {
                   <button
                     id="btn-trigger-google-auth"
                     type="button"
-                    onClick={() => setShowGoogleSim(true)}
+                    onClick={startGoogleSignIn}
                     className="w-full py-3 bg-neutral-900/40 hover:bg-neutral-900 border border-white/10 hover:border-white/20 text-white font-mono text-[10.5px] uppercase tracking-widest rounded cursor-pointer duration-300 transition-all flex items-center justify-center gap-2.5 h-11"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">

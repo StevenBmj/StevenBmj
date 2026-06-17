@@ -6,6 +6,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { randomBytes } from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
@@ -77,6 +78,11 @@ function isValidEmailAddress(value: string) {
 
 function isValidPersonName(value: string) {
   return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}$/.test(value.trim()) && !/\d/.test(value);
+}
+
+function generateAuthCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(randomBytes(6), (byte) => alphabet[byte % alphabet.length]).join('');
 }
 
 const app = express();
@@ -814,8 +820,8 @@ app.post('/api/auth/register', async (req, res) => {
     return res.status(400).json({ error: "Cette adresse e-mail est déjà enregistrée." });
   }
 
-  // Generate a random 6-digit numeric activation code
-  const activationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const activationCode = generateAuthCode();
+  const activationExpiresAt = new Date(Date.now() + 60_000).toISOString();
 
   const isSecuredAdmin = emailKey === ADMIN_EMAIL;
 
@@ -845,6 +851,7 @@ app.post('/api/auth/register', async (req, res) => {
     isAdmin: isSecuredAdmin,
     isConfirmed: isSecuredAdmin, // Admin is auto-confirmed
     activationCode: isSecuredAdmin ? '' : activationCode,
+    activationExpiresAt: isSecuredAdmin ? null : activationExpiresAt,
     dateJoined: new Date().toISOString()
   };
 
@@ -869,6 +876,7 @@ app.post('/api/auth/register', async (req, res) => {
       <div style="background-color: #0b0b0b; border: 1px solid #cca43b; font-family: monospace; font-size: 26px; font-weight: bold; text-align: center; color: #ffffff; padding: 22px; margin: 25px 0; letter-spacing: 0.3em; border-radius: 4px;">
         ${activationCode}
       </div>
+      <p>Ce code expire dans 1 minute.</p>
       <p>Sans cette confirmation indispensable, vos options d'atelier resteront suspendues aux fins de protection de notre clientèle.</p>
       <p style="margin-top: 35px;">Cordialement,</p>
       <p><strong>Le Bureau de Validation</strong><br/>StevenBmj Paris - Cotonou</p>
@@ -893,7 +901,7 @@ app.post('/api/auth/register', async (req, res) => {
     success: true, 
     requiresActivation: !isSecuredAdmin,
     email: newUser.email,
-    message: !isSecuredAdmin ? "Un code est envoye a votre adresse mail. Entrez-le pour finaliser votre compte." : undefined,
+    message: !isSecuredAdmin ? "Un code est envoyé à votre adresse mail. Entrez-le dans la minute pour finaliser votre compte." : undefined,
     user: isSecuredAdmin ? { 
       id: newUser.id, 
       name: newUser.name, 
@@ -993,12 +1001,18 @@ app.post('/api/auth/activate', async (req, res) => {
     return res.status(404).json({ error: "Compte client introuvable." });
   }
 
-  if (user.activationCode !== code.trim()) {
+  const expiresAt = user.activationExpiresAt ? new Date(user.activationExpiresAt).getTime() : 0;
+  if (!user.activationCode || !expiresAt || Date.now() > expiresAt) {
+    return res.status(400).json({ error: "Le code a expire. Veuillez creer le compte a nouveau pour recevoir un nouveau code." });
+  }
+
+  if (String(user.activationCode).toUpperCase() !== String(code).trim().toUpperCase()) {
     return res.status(400).json({ error: "Le code de confirmation saisi est erroné." });
   }
 
   user.isConfirmed = true;
   user.activationCode = ''; // Consume the activation code
+  user.activationExpiresAt = null;
   const supabase = getSupabaseAdmin();
   if (supabase) {
     await upsertProfile(supabase, user);
@@ -1013,12 +1027,35 @@ app.post('/api/auth/activate', async (req, res) => {
   });
 });
 
-app.post('/api/auth/google', async (req, res) => {
-  const { email, name } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: "E-mail de compte Google requis." });
+async function verifyGoogleCredential(credential: string) {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    throw new Error("Google Auth doit etre configure avec GOOGLE_CLIENT_ID.");
   }
-  const emailKey = email.trim().toLowerCase();
+  const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  if (!response.ok) throw new Error("Identite Google invalide.");
+  const payload: any = await response.json();
+  if (payload.aud !== clientId) throw new Error("Client Google non autorise.");
+  if (!payload.email || payload.email_verified !== 'true') throw new Error("Adresse Google non verifiee.");
+  return {
+    email: String(payload.email).trim().toLowerCase(),
+    name: String(payload.name || payload.email.split('@')[0]).trim(),
+  };
+}
+
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    return res.status(400).json({ error: "Authentification Google reelle requise." });
+  }
+
+  let googleUser;
+  try {
+    googleUser = await verifyGoogleCredential(String(credential));
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message || "Identite Google invalide." });
+  }
+  const emailKey = googleUser.email;
 
   // If Admin logging in with Google
   if (emailKey === 'stevenamorin202@gmail.com') {
@@ -1041,14 +1078,15 @@ app.post('/api/auth/google', async (req, res) => {
     // Automatically create a user
     user = {
       id: `usr-${Date.now()}`,
-      name: name || email.split('@')[0],
-      email: email.trim(),
-      password: `google-linked-${Date.now()}`,
+      name: googleUser.name,
+      email: googleUser.email,
+      password: `google-linked-${randomBytes(18).toString('hex')}`,
       googleLinked: true,
       vipPoints: 200, // Double bonus points on google registration!
       isAdmin: false,
       isConfirmed: true, // Google users are pre-confirmed
       activationCode: '',
+      activationExpiresAt: null,
       dateJoined: new Date().toISOString()
     };
     dbStore.users.unshift(user);

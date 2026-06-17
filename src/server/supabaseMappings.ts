@@ -175,7 +175,9 @@ export function profileToUser(profile: any) {
     isAdmin: Boolean(profile.is_admin),
     isConfirmed: Boolean(profile.is_confirmed),
     activationCode: profile.activation_code || '',
+    activationExpiresAt: profile.activation_expires_at || '',
     resetCode: profile.reset_code || '',
+    resetExpiresAt: profile.reset_expires_at || '',
     dateJoined: profile.date_joined,
   };
 }

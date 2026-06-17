@@ -161,7 +161,9 @@ export async function upsertProfile(client: SupabaseClient, profile: any) {
     is_admin: Boolean(profile.isAdmin),
     is_confirmed: Boolean(profile.isConfirmed),
     activation_code: profile.activationCode || '',
+    activation_expires_at: profile.activationExpiresAt || null,
     reset_code: profile.resetCode || '',
+    reset_expires_at: profile.resetExpiresAt || null,
     date_joined: profile.dateJoined || new Date().toISOString(),
   }, { onConflict: 'id' });
   if (error) throw error;
