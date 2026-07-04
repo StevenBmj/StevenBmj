@@ -101,7 +101,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
     if (!user) return;
 
     try {
-      const res = await fetch('/api/auth/client/change-password', {
+      const res = await fetch('/api/auth/request-reset-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

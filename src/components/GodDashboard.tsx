@@ -11,7 +11,7 @@ import {
   BarChart, Sparkles, Plus, Edit2, Trash2, Tag, Percent, 
   Settings, Search, RefreshCw, Layers, ShieldAlert, Users, 
   HelpCircle, CheckCircle, Clock, Ban, Check, AlertOctagon, CheckSquare,
-  Megaphone, Send, Mail, MessageSquare, PhoneCall, Star, LogOut
+  Megaphone, Send, Mail, MessageSquare, PhoneCall, Star, LogOut, Eye, EyeOff
 } from 'lucide-react';
 
 export default function GodDashboard() {
@@ -28,6 +28,8 @@ export default function GodDashboard() {
   
   const [adminUsername, setAdminUsername] = useState('');
   const [adminLoginPassword, setAdminLoginPassword] = useState('');
+  const [showAdminLoginPassword, setShowAdminLoginPassword] = useState(false);
+  const [showAdminRecoverPassword, setShowAdminRecoverPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [showGoogleSim, setShowGoogleSim] = useState(false);
 
@@ -1045,14 +1047,24 @@ export default function GodDashboard() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? "Nouveau Mot de Passe *" : "New Secret Passcode *"}</label>
-                <input
-                  type="password"
-                  required
-                  value={recoverNewPassword}
-                  onChange={(e) => setRecoverNewPassword(e.target.value)}
-                  className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white rounded focus:border-red-500 focus:outline-none font-mono"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showAdminRecoverPassword ? 'text' : 'password'}
+                    required
+                    value={recoverNewPassword}
+                    onChange={(e) => setRecoverNewPassword(e.target.value)}
+                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 pr-11 py-3 text-white rounded focus:border-red-500 focus:outline-none font-mono"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminRecoverPassword(!showAdminRecoverPassword)}
+                    className="absolute right-3 top-3 text-neutral-500 hover:text-white"
+                    aria-label={showAdminRecoverPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showAdminRecoverPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -1136,15 +1148,25 @@ export default function GodDashboard() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-mono text-neutral-500 uppercase block">Code Secret d'Accès *</label>
-                <input
-                  id="admin-login-password"
-                  type="password"
-                  required
-                  value={adminLoginPassword}
-                  onChange={(e) => setAdminLoginPassword(e.target.value)}
-                  className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white rounded focus:border-red-500 focus:outline-none font-mono"
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    id="admin-login-password"
+                    type={showAdminLoginPassword ? 'text' : 'password'}
+                    required
+                    value={adminLoginPassword}
+                    onChange={(e) => setAdminLoginPassword(e.target.value)}
+                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 pr-11 py-3 text-white rounded focus:border-red-500 focus:outline-none font-mono"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminLoginPassword(!showAdminLoginPassword)}
+                    className="absolute right-3 top-3 text-neutral-500 hover:text-white"
+                    aria-label={showAdminLoginPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showAdminLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -1201,7 +1223,7 @@ export default function GodDashboard() {
                   }}
                   className="text-[10px] text-red-500 hover:text-red-400 font-mono uppercase tracking-wider underline cursor-pointer"
                 >
-                  {language === 'FR' ? "Créer / Configurer son Code Secret" : "Create / Alter Secret Passcode"}
+                  {language === 'FR' ? "Mot de passe oublié ?" : "Forgot password?"}
                 </button>
               </div>
             </form>

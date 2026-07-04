@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Mail, Lock, User, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
 
@@ -27,12 +27,16 @@ export default function AuthModal() {
     addVipPoints
   } = useApp();
 
-  const [mode, setMode] = useState<'login' | 'register' | 'activate'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'activate' | 'recover'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [activationEmail, setActivationEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -171,6 +175,63 @@ export default function AuthModal() {
     }
   };
 
+  const sendPasswordResetCode = async () => {
+    setError('');
+    setResetSuccess('');
+    if (!email.trim()) {
+      setError(language === 'FR' ? "Saisissez votre adresse e-mail avant de demander le code." : "Enter your email before requesting the code.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/request-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'envoi du code.");
+      setResetEmailSent(true);
+      setResetSuccess(language === 'FR' ? "Un code de reinitialisation est envoye a votre adresse mail." : "A reset code has been sent to your email.");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setResetSuccess('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/request-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          code: resetCode.trim(),
+          newPassword: password
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur de reinitialisation.');
+      setResetSuccess(language === 'FR' ? "Mot de passe modifie. Vous pouvez vous connecter." : "Password updated. You can sign in.");
+      setResetCode('');
+      setPassword('');
+      setResetEmailSent(false);
+      setTimeout(() => {
+        setMode('login');
+        setResetSuccess('');
+      }, 1800);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const startGoogleSignIn = () => {
     setError('');
     if (!googleClientId) {
@@ -268,14 +329,18 @@ export default function AuthModal() {
             {language === 'FR' ? "AUTHENTIFICATION DIRECTE SBMJ" : "SBMJ ACCESS SECURED"}
           </span>
           <h3 className="text-xl font-light text-white uppercase tracking-widest font-sans">
-            {mode === 'login' 
-              ? (language === 'FR' ? "Maison StevenBmj" : "Maison StevenBmj")
-              : (language === 'FR' ? "Créer un Compte" : "Join the House")}
+            {mode === 'recover'
+              ? (language === 'FR' ? "Mot de passe oublie" : "Forgot Password")
+              : mode === 'login'
+                ? (language === 'FR' ? "Maison StevenBmj" : "Maison StevenBmj")
+                : (language === 'FR' ? "Créer un Compte" : "Join the House")}
           </h3>
           <p className="text-[10px] text-neutral-550 max-w-xs mt-1 leading-relaxed text-neutral-500">
-            {mode === 'login'
-              ? (language === 'FR' ? "Connectez-vous pour finaliser votre commande d'exception ou signer un avis souverain." : "Log in to finalize your prestigious carriage or deposit an outstanding review.")
-              : (language === 'FR' ? "Rejoignez le salon de prestige pour accumuler vos points et commander sur-mesure." : "Enter our elite circle to claim immediate VIP member points and access custom measurements.")}
+            {mode === 'recover'
+              ? (language === 'FR' ? "Recevez un code par e-mail pour creer un nouveau mot de passe." : "Receive an email code to create a new password.")
+              : mode === 'login'
+                ? (language === 'FR' ? "Connectez-vous pour finaliser votre commande d'exception ou signer un avis souverain." : "Log in to finalize your prestigious carriage or deposit an outstanding review.")
+                : (language === 'FR' ? "Rejoignez le salon de prestige pour accumuler vos points et commander sur-mesure." : "Enter our elite circle to claim immediate VIP member points and access custom measurements.")}
           </p>
         </div>
 
@@ -402,7 +467,7 @@ export default function AuthModal() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              onSubmit={handleManualSubmit} 
+              onSubmit={mode === 'recover' ? handlePasswordRecovery : handleManualSubmit} 
               className="space-y-4"
             >
               
@@ -458,6 +523,103 @@ export default function AuthModal() {
                     </button>
                   </div>
                 </div>
+              ) : mode === 'recover' ? (
+                <>
+                  {resetSuccess && (
+                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/20 text-emerald-400 rounded text-[11px] font-mono uppercase tracking-wide text-center">
+                      {resetSuccess}
+                    </div>
+                  )}
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
+                      {language === 'FR' ? "Adresse e-mail du compte *" : "Account email address *"}
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-neutral-600" />
+                      <input
+                        id="auth-recover-email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="vip@stevenbmj.com"
+                        className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-3.5 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none placeholder-neutral-700 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={sendPasswordResetCode}
+                    disabled={loading}
+                    className="w-full py-2.5 border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 disabled:opacity-50 font-mono text-[10px] font-bold uppercase tracking-widest rounded cursor-pointer duration-300"
+                  >
+                    {language === 'FR' ? "Envoyer le code par mail" : "Send code by email"}
+                  </button>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
+                      {language === 'FR' ? "Code recu par e-mail *" : "Email code *"}
+                    </label>
+                    <input
+                      id="auth-recover-code"
+                      type="text"
+                      required
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value.trim())}
+                      placeholder="123456"
+                      className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none placeholder-neutral-700 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1 text-left">
+                    <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
+                      {language === 'FR' ? "Nouveau mot de passe *" : "New password *"}
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-neutral-600" />
+                      <input
+                        id="auth-recover-password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={8}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-11 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none font-mono placeholder-neutral-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-neutral-500 hover:text-white"
+                        aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || !resetEmailSent}
+                    className="w-full py-3 bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-50 font-mono text-[10.5px] font-bold uppercase tracking-widest rounded cursor-pointer duration-300 flex items-center justify-center"
+                  >
+                    {loading ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : (language === 'FR' ? "Modifier mon mot de passe" : "Update my password")}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('login');
+                      setError('');
+                      setResetSuccess('');
+                    }}
+                    className="w-full py-2 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white rounded font-mono text-[10px] uppercase cursor-pointer"
+                  >
+                    {language === 'FR' ? "Retour a la connexion" : "Return to login"}
+                  </button>
+                </>
               ) : (
                 <>
                   {/* Form Input fields */}
@@ -511,14 +673,22 @@ export default function AuthModal() {
                       <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-neutral-600" />
                       <input
                         id="auth-input-password"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
                         minLength={8}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-3.5 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none font-mono placeholder-neutral-700"
+                        className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-11 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none font-mono placeholder-neutral-700"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-neutral-500 hover:text-white"
+                        aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -577,6 +747,20 @@ export default function AuthModal() {
 
                   {/* Toggle Access mode link */}
                   <div className="pt-4 text-center">
+                    {mode === 'login' && (
+                      <button
+                        id="btn-forgot-client-password"
+                        type="button"
+                        onClick={() => {
+                          setMode('recover');
+                          setError('');
+                          setResetSuccess('');
+                        }}
+                        className="block mx-auto mb-3 text-neutral-400 hover:text-amber-400 font-mono text-[10px] uppercase tracking-wider underline cursor-pointer"
+                      >
+                        {language === 'FR' ? "Mot de passe oublie ?" : "Forgot password?"}
+                      </button>
+                    )}
                     <button
                       id="btn-toggle-auth-mode"
                       type="button"

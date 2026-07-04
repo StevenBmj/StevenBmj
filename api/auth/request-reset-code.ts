@@ -52,6 +52,26 @@ export default async function handler(req: any, res: any) {
     if (!email) return json(res, 400, { error: "L'adresse email est requise." });
 
     const supabase = supabaseAdmin();
+    const submittedCode = String(body.code || '').trim();
+    const newPassword = String(body.newPassword || '');
+
+    if (submittedCode || newPassword) {
+      if (!submittedCode || !newPassword) return json(res, 400, { error: 'Le code et le nouveau mot de passe sont requis.' });
+      if (newPassword.length < 8) return json(res, 400, { error: 'Le mot de passe doit contenir au moins 8 caracteres.' });
+      const profile = await supabase.from('profiles').select('*').eq('email', email).maybeSingle();
+      if (profile.error) throw profile.error;
+      if (!profile.data) return json(res, 404, { error: "Aucun compte client n'existe sous cet identifiant." });
+      if (profile.data.is_admin) return json(res, 403, { error: 'Utilisez la recuperation administrateur.' });
+      if (!profile.data.reset_code || String(profile.data.reset_code).trim() !== submittedCode) {
+        return json(res, 403, { error: 'Le code de reinitialisation est incorrect ou expire.' });
+      }
+      const update = await supabase.auth.admin.updateUserById(profile.data.id, { password: newPassword });
+      if (update.error) throw update.error;
+      const cleared = await supabase.from('profiles').update({ reset_code: '', reset_expires_at: null }).eq('email', email);
+      if (cleared.error) throw cleared.error;
+      return json(res, 200, { success: true, message: 'Votre mot de passe a ete modifie avec succes.' });
+    }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     if (email === ADMIN_EMAIL) {
