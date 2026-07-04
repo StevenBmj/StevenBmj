@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Mail, Lock, User, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,11 +11,14 @@ declare global {
         id: {
           initialize: (options: any) => void;
           prompt: (callback?: (notification: any) => void) => void;
+          renderButton: (parent: HTMLElement, options: any) => void;
         };
       };
     };
   }
 }
+
+const ACTIVATION_WINDOW_SECONDS = 5 * 60;
 
 export default function AuthModal() {
   const { 
@@ -33,6 +36,9 @@ export default function AuthModal() {
   const [fullName, setFullName] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [activationEmail, setActivationEmail] = useState('');
+  const [activationDeadline, setActivationDeadline] = useState<number | null>(null);
+  const [activationRemaining, setActivationRemaining] = useState(ACTIVATION_WINDOW_SECONDS);
+  const [resendFeedback, setResendFeedback] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetSuccess, setResetSuccess] = useState('');
@@ -43,13 +49,105 @@ export default function AuthModal() {
   const [showGoogleSim, setShowGoogleSim] = useState(false);
 
   const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const [googleButtonReady, setGoogleButtonReady] = useState(false);
   const [googleAccounts, setGoogleAccounts] = useState<any[]>([]);
   const [newGoogleName, setNewGoogleName] = useState('');
   const [newGoogleEmail, setNewGoogleEmail] = useState('');
   const [isAddingGoogle, setIsAddingGoogle] = useState(false);
   const [googleAddError, setGoogleAddError] = useState('');
 
-  if (!authModalOpen) return null;
+  const startActivationTimer = () => {
+    const deadline = Date.now() + ACTIVATION_WINDOW_SECONDS * 1000;
+    setActivationDeadline(deadline);
+    setActivationRemaining(ACTIVATION_WINDOW_SECONDS);
+  };
+
+  const formatActivationTime = (seconds: number) => {
+    const safeSeconds = Math.max(0, seconds);
+    const minutes = Math.floor(safeSeconds / 60).toString().padStart(2, '0');
+    const remainingSeconds = (safeSeconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${remainingSeconds}`;
+  };
+
+  useEffect(() => {
+    if (!authModalOpen || mode !== 'activate' || !activationDeadline) return;
+    const updateRemaining = () => {
+      const remaining = Math.max(0, Math.ceil((activationDeadline - Date.now()) / 1000));
+      setActivationRemaining(remaining);
+    };
+    updateRemaining();
+    const timer = window.setInterval(updateRemaining, 1000);
+    return () => window.clearInterval(timer);
+  }, [authModalOpen, activationDeadline, mode]);
+
+  useEffect(() => {
+    if (!authModalOpen || showGoogleSim || (mode !== 'login' && mode !== 'register')) return;
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    let cancelled = false;
+    setGoogleButtonReady(false);
+
+    const renderOfficialButton = () => {
+      if (cancelled || !googleButtonRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response: any) => {
+          if (response?.credential) handleGoogleCredential(response.credential);
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        type: 'standard',
+        shape: 'rectangular',
+        text: mode === 'login' ? 'signin_with' : 'signup_with',
+        logo_alignment: 'left',
+        width: Math.min(360, Math.max(260, googleButtonRef.current.clientWidth || 320)),
+      });
+      setGoogleButtonReady(true);
+    };
+
+    if (window.google?.accounts?.id) {
+      renderOfficialButton();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      existing.addEventListener('load', renderOfficialButton, { once: true });
+      return () => {
+        cancelled = true;
+        existing.removeEventListener('load', renderOfficialButton);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = renderOfficialButton;
+    script.onerror = () => {
+      if (!cancelled) {
+        setError(language === 'FR'
+          ? "Impossible de charger Google Auth. Verifiez la connexion reseau."
+          : "Unable to load Google Auth. Please check the network connection."
+        );
+      }
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.onload = null;
+      script.onerror = null;
+    };
+  }, [authModalOpen, googleClientId, language, mode, showGoogleSim]);
 
   const addNewGoogleAccount = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +194,9 @@ export default function AuthModal() {
         if (!res.ok) {
           throw new Error(data.error || 'Erreur d\'activation');
         }
+        setActivationDeadline(null);
+        setActivationRemaining(ACTIVATION_WINDOW_SECONDS);
+        setActivationCode('');
         setUser(data.user);
         addVipPoints(100);
         executeAuthCallback();
@@ -117,6 +218,9 @@ export default function AuthModal() {
       if (!res.ok) {
         if (data.error === "UNCONFIRMED_ACCOUNT") {
           setActivationEmail(data.email || email);
+          setActivationCode('');
+          setResendFeedback('');
+          startActivationTimer();
           setMode('activate');
           setError(language === 'FR' 
             ? "Votre compte d'exception est en attente d'activation. Veuillez entrer le code d'activation reçu par e-mail." 
@@ -129,6 +233,9 @@ export default function AuthModal() {
 
       if (data.requiresActivation) {
         setActivationEmail(data.email);
+        setActivationCode('');
+        setResendFeedback('');
+        startActivationTimer();
         setMode('activate');
         setError('');
         return;
@@ -200,6 +307,34 @@ export default function AuthModal() {
     }
   };
 
+  const resendActivationCode = async () => {
+    const targetEmail = (activationEmail || email).trim().toLowerCase();
+    setError('');
+    setResendFeedback('');
+    if (!targetEmail) {
+      setError(language === 'FR' ? "Adresse e-mail manquante pour renvoyer le code." : "Missing email address for the new code.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail, resend: true })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'envoi du code.");
+      setActivationCode('');
+      setActivationEmail(data.email || targetEmail);
+      startActivationTimer();
+      setResendFeedback(data.message || (language === 'FR' ? "Un nouveau code est envoye a votre adresse mail." : "A new code has been sent to your email."));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePasswordRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -236,7 +371,7 @@ export default function AuthModal() {
     setError('');
     if (!googleClientId) {
       setError(language === 'FR'
-        ? "Google réel n'est pas encore configuré. Ajoutez VITE_GOOGLE_CLIENT_ID et GOOGLE_CLIENT_ID dans Vercel pour proposer les comptes Google de l'appareil."
+        ? "Google reel n'est pas encore configure. Ajoutez VITE_GOOGLE_CLIENT_ID et GOOGLE_CLIENT_ID dans Vercel pour proposer les comptes Google de l'appareil."
         : "Real Google Sign-In is not configured yet. Add VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID in Vercel to show the device Google accounts."
       );
       return;
@@ -254,8 +389,8 @@ export default function AuthModal() {
       window.google?.accounts.id.prompt((notification: any) => {
         if (notification?.isNotDisplayed?.() || notification?.isSkippedMoment?.()) {
           setError(language === 'FR'
-            ? "Google n'a pas pu afficher le sélecteur de comptes. Vérifiez que les popups/cookies Google sont autorisés."
-            : "Google could not show the account picker. Check that Google popups/cookies are allowed."
+            ? "Si le selecteur ne s'ouvre pas, cliquez sur le bouton officiel Google affiche au-dessus."
+            : "If the picker does not open, use the official Google button shown above."
           );
         }
       });
@@ -278,7 +413,7 @@ export default function AuthModal() {
     script.defer = true;
     script.onload = openPrompt;
     script.onerror = () => setError(language === 'FR'
-      ? "Impossible de charger Google Auth. Vérifiez la connexion réseau."
+      ? "Impossible de charger Google Auth. Verifiez la connexion reseau."
       : "Unable to load Google Auth. Please check the network connection."
     );
     document.head.appendChild(script);
@@ -290,6 +425,8 @@ export default function AuthModal() {
       : "Fake Google accounts have been removed. Use real Google Sign-In."
     );
   };
+
+  if (!authModalOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
@@ -479,7 +616,36 @@ export default function AuthModal() {
                         ? `Un code est envoye a votre adresse mail :\n${activationEmail || email}` 
                         : `A code has been sent to your email address:\n${activationEmail || email}`}
                     </p>
+                    <div className="mt-3 flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest">
+                      <span className={activationRemaining > 0 ? 'text-neutral-400' : 'text-red-400'}>
+                        {activationRemaining > 0
+                          ? `${language === 'FR' ? 'Temps restant' : 'Time left'} ${formatActivationTime(activationRemaining)}`
+                          : (language === 'FR' ? 'Code expire' : 'Code expired')}
+                      </span>
+                    </div>
                   </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between rounded border border-white/10 bg-black/30 p-3">
+                    <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
+                      {language === 'FR'
+                        ? "Pas de mail ? Verifiez les spams ou demandez un nouveau code."
+                        : "No email? Check spam or request a new code."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={resendActivationCode}
+                      disabled={loading}
+                      className="shrink-0 px-3 py-2 border border-amber-500/30 text-amber-400 hover:text-black hover:bg-amber-400 disabled:opacity-50 font-mono text-[9px] uppercase tracking-widest rounded cursor-pointer duration-300"
+                    >
+                      {language === 'FR' ? 'Renvoyer le code' : 'Resend code'}
+                    </button>
+                  </div>
+
+                  {resendFeedback && (
+                    <p className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest text-center">
+                      {resendFeedback}
+                    </p>
+                  )}
 
                   <div className="space-y-1 block text-left">
                     <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
@@ -717,33 +883,55 @@ export default function AuthModal() {
                     <div className="flex-grow border-t border-white/5"></div>
                   </div>
 
-                  {/* Secure Google Login Trigger Button */}
-                  <button
-                    id="btn-trigger-google-auth"
-                    type="button"
-                    onClick={startGoogleSignIn}
-                    className="w-full py-3 bg-neutral-900/40 hover:bg-neutral-900 border border-white/10 hover:border-white/20 text-white font-mono text-[10.5px] uppercase tracking-widest rounded cursor-pointer duration-300 transition-all flex items-center justify-center gap-2.5 h-11"
-                  >
-                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.61c-.29 1.5-.14 3.1-.14 4.58l3.12 2.42c1.83-1.68 3.15-4.17 3.15-8.83z"
+                  {googleClientId && (
+                    <div className="w-full flex justify-center">
+                      <div
+                        id="google-official-signin"
+                        ref={googleButtonRef}
+                        className="min-h-11 w-full flex justify-center overflow-hidden"
                       />
-                      <path
-                        fill="#34A853"
-                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.12-2.42c-.9.6-2.05.98-4.81.98-3.73 0-6.88-2.51-8.01-5.89l-3.23 2.5C2.86 20.3 7.02 24 12 24z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M3.99 13.76c-.28-.84-.44-1.74-.44-2.67s.16-1.83.44-2.67l-3.23-2.5C.28 7.6 0 9.77 0 12s.28 4.4 1 6.09l3.23-2.5c.01-.27-.24-.52-.24-.83z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.41-3.41C17.94 1.19 15.23 0 12 0 7.02 0 2.86 3.7 1 7.91l3.23 2.5c1.13-3.37 4.28-5.89 8.01-5.89z"
-                      />
-                    </svg>
-                    <span>{language === 'FR' ? "Continuer avec Google" : "Continue with Google"}</span>
-                  </button>
+                    </div>
+                  )}
+
+                  {(!googleClientId || !googleButtonReady) && (
+                    <button
+                      id="btn-trigger-google-auth"
+                      type="button"
+                      onClick={startGoogleSignIn}
+                      className="w-full py-3 bg-neutral-900/40 hover:bg-neutral-900 border border-white/10 hover:border-white/20 text-white font-mono text-[10.5px] uppercase tracking-widest rounded cursor-pointer duration-300 transition-all flex items-center justify-center gap-2.5 h-11"
+                    >
+                      <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.61c-.29 1.5-.14 3.1-.14 4.58l3.12 2.42c1.83-1.68 3.15-4.17 3.15-8.83z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.12-2.42c-.9.6-2.05.98-4.81.98-3.73 0-6.88-2.51-8.01-5.89l-3.23 2.5C2.86 20.3 7.02 24 12 24z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M3.99 13.76c-.28-.84-.44-1.74-.44-2.67s.16-1.83.44-2.67l-3.23-2.5C.28 7.6 0 9.77 0 12s.28 4.4 1 6.09l3.23-2.5c.01-.27-.24-.52-.24-.83z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.41-3.41C17.94 1.19 15.23 0 12 0 7.02 0 2.86 3.7 1 7.91l3.23 2.5c1.13-3.37 4.28-5.89 8.01-5.89z"
+                        />
+                      </svg>
+                      <span>{language === 'FR' ? "Continuer avec Google" : "Continue with Google"}</span>
+                    </button>
+                  )}
+
+                  {googleClientId && googleButtonReady && (
+                    <button
+                      id="btn-trigger-google-auth"
+                      type="button"
+                      onClick={startGoogleSignIn}
+                      className="w-full text-neutral-500 hover:text-amber-400 font-mono text-[9px] uppercase tracking-widest underline cursor-pointer"
+                    >
+                      {language === 'FR' ? "Le selecteur ne s'ouvre pas ? Reessayer" : "Picker did not open? Try again"}
+                    </button>
+                  )}
 
                   {/* Toggle Access mode link */}
                   <div className="pt-4 text-center">

@@ -821,7 +821,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   const activationCode = generateAuthCode();
-  const activationExpiresAt = new Date(Date.now() + 3 * 60_000).toISOString();
+  const activationExpiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
 
   const isSecuredAdmin = emailKey === ADMIN_EMAIL;
 
@@ -876,7 +876,7 @@ app.post('/api/auth/register', async (req, res) => {
       <div style="background-color: #0b0b0b; border: 1px solid #cca43b; font-family: monospace; font-size: 26px; font-weight: bold; text-align: center; color: #ffffff; padding: 22px; margin: 25px 0; letter-spacing: 0.3em; border-radius: 4px;">
         ${activationCode}
       </div>
-      <p>Ce code expire dans 3 minutes.</p>
+      <p>Ce code expire dans 5 minutes.</p>
       <p>Sans cette confirmation indispensable, vos options d'atelier resteront suspendues aux fins de protection de notre clientèle.</p>
       <p style="margin-top: 35px;">Cordialement,</p>
       <p><strong>Le Bureau de Validation</strong><br/>StevenBmj Paris - Cotonou</p>
@@ -990,8 +990,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/activate', async (req, res) => {
-  const { email, code } = req.body;
-  if (!email || !code) {
+  const { email, code, resend, action } = req.body;
+  const shouldResend = resend === true || action === 'resend';
+  if (!email || (!shouldResend && !code)) {
     return res.status(400).json({ error: "Tous les champs d'activation sont requis." });
   }
   const emailKey = email.trim().toLowerCase();
@@ -1001,9 +1002,44 @@ app.post('/api/auth/activate', async (req, res) => {
     return res.status(404).json({ error: "Compte client introuvable." });
   }
 
+  if (user.isConfirmed) {
+    return res.status(400).json({ error: "Ce compte est deja active." });
+  }
+
+  if (shouldResend) {
+    const nextCode = generateAuthCode();
+    user.activationCode = nextCode;
+    user.activationExpiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+
+    const subject = "Activation de votre compte Maison StevenBmj";
+    const bodyPrat = `
+      <p style="font-size: 15px; color: #cca43b; font-weight: bold; margin-bottom: 20px;">NOUVEAU CODE STEVENBMJ</p>
+      <p>Votre nouveau code d'activation StevenBmj est :</p>
+      <div style="background-color: #0b0b0b; border: 1px solid #cca43b; font-family: monospace; font-size: 26px; font-weight: bold; text-align: center; color: #ffffff; padding: 22px; margin: 25px 0; letter-spacing: 0.3em; border-radius: 4px;">
+        ${nextCode}
+      </div>
+      <p>Ce code expire dans 5 minutes.</p>
+    `;
+    const emailSent = await sendCoutureEmail(email.trim(), subject, bodyPrat);
+    if (!emailSent) {
+      return res.status(500).json({ error: "Impossible d'envoyer le code d'activation par e-mail. Verifiez la configuration SMTP puis reessayez." });
+    }
+
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      await upsertProfile(supabase, user);
+    }
+    saveDb();
+    return res.json({
+      success: true,
+      email: emailKey,
+      message: "Un nouveau code est envoyé à votre adresse mail. Entrez-le dans les 5 minutes."
+    });
+  }
+
   const expiresAt = user.activationExpiresAt ? new Date(user.activationExpiresAt).getTime() : 0;
   if (!user.activationCode || !expiresAt || Date.now() > expiresAt) {
-    return res.status(400).json({ error: "Le code a expire. Veuillez creer le compte a nouveau pour recevoir un nouveau code." });
+    return res.status(400).json({ error: "Le code a expire. Cliquez sur \"Renvoyer le code\" pour recevoir un nouveau code." });
   }
 
   if (String(user.activationCode).toUpperCase() !== String(code).trim().toUpperCase()) {
