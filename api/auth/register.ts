@@ -128,7 +128,7 @@ export default async function handler(req: any, res: any) {
       requiresActivation: !isAdmin,
       email,
       emailSent,
-      message: !isAdmin ? "Un code est envoyé à votre adresse mail. Entrez-le dans la minute pour finaliser votre compte." : undefined,
+      message: !isAdmin ? "Un code est envoyé à votre adresse mail. Entrez-le dans les 3 minutes pour finaliser votre compte." : undefined,
       user: isAdmin ? publicUser(profile) : null,
     });
   } catch (error: any) {
