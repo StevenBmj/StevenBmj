@@ -821,7 +821,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   const activationCode = generateAuthCode();
-  const activationExpiresAt = new Date(Date.now() + 60_000).toISOString();
+  const activationExpiresAt = new Date(Date.now() + 3 * 60_000).toISOString();
 
   const isSecuredAdmin = emailKey === ADMIN_EMAIL;
 
@@ -876,7 +876,7 @@ app.post('/api/auth/register', async (req, res) => {
       <div style="background-color: #0b0b0b; border: 1px solid #cca43b; font-family: monospace; font-size: 26px; font-weight: bold; text-align: center; color: #ffffff; padding: 22px; margin: 25px 0; letter-spacing: 0.3em; border-radius: 4px;">
         ${activationCode}
       </div>
-      <p>Ce code expire dans 1 minute.</p>
+      <p>Ce code expire dans 3 minutes.</p>
       <p>Sans cette confirmation indispensable, vos options d'atelier resteront suspendues aux fins de protection de notre clientèle.</p>
       <p style="margin-top: 35px;">Cordialement,</p>
       <p><strong>Le Bureau de Validation</strong><br/>StevenBmj Paris - Cotonou</p>

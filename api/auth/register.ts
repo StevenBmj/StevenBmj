@@ -61,7 +61,7 @@ async function sendActivationEmail(email: string, activationCode: string) {
       from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
       to: email,
       subject: 'Activation de votre compte Maison StevenBmj',
-      html: `<p>Votre code d'activation StevenBmj est :</p><h2>${activationCode}</h2><p>Ce code expire dans 1 minute.</p>`,
+      html: `<p>Votre code d'activation StevenBmj est :</p><h2>${activationCode}</h2><p>Ce code expire dans 3 minutes.</p>`,
     });
     return true;
   } catch {
@@ -88,7 +88,7 @@ export default async function handler(req: any, res: any) {
 
     const isAdmin = email === ADMIN_EMAIL;
     const activationCode = isAdmin ? '' : generateActivationCode();
-    const activationExpiresAt = isAdmin ? null : new Date(Date.now() + 60_000).toISOString();
+    const activationExpiresAt = isAdmin ? null : new Date(Date.now() + 3 * 60_000).toISOString();
     const auth = await supabase.auth.admin.createUser({
       email,
       password,
