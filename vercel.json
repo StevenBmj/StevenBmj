@@ -27,6 +27,26 @@
   ],
   "rewrites": [
     {
+      "source": "/api/promos/:code/toggle",
+      "destination": "/api/shop?resource=promos&code=:code&action=toggle"
+    },
+    {
+      "source": "/api/promos/:code",
+      "destination": "/api/shop?resource=promos&code=:code"
+    },
+    {
+      "source": "/api/promos",
+      "destination": "/api/shop?resource=promos"
+    },
+    {
+      "source": "/api/orders/:id",
+      "destination": "/api/shop?resource=orders&id=:id"
+    },
+    {
+      "source": "/api/orders",
+      "destination": "/api/shop?resource=orders"
+    },
+    {
       "source": "/((?!api/.*).*)",
       "destination": "/index.html"
     }
