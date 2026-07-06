@@ -14,6 +14,18 @@ interface CheckoutModalProps {
   onOrderSuccess: (order: any) => void;
 }
 
+async function imageToDataUrl(src: string) {
+  const response = await fetch(src);
+  if (!response.ok) throw new Error(`Unable to load image: ${src}`);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModalProps) {
   const { language, cart, formatPrice, clearCart, currency, appliedPromo, setAppliedPromo, lastInvoice, setLastInvoice, user } = useApp();
   const invoiceCardRef = useRef<HTMLDivElement | null>(null);
@@ -326,32 +338,159 @@ ${itemsText}
   };
 
   const handleDownloadInvoiceAndWhatsApp = async () => {
-    if (!completedOrder || !invoiceCardRef.current) return;
+    if (!completedOrder) return;
     if (!invoiceQrDataUrl) {
-      alert(language === 'FR' ? 'Le QR code de la facture est en préparation. Réessayez dans un instant.' : 'The invoice QR code is still being prepared. Try again in a moment.');
+      alert(language === 'FR' ? 'Le QR code de la facture est en preparation. Reessayez dans un instant.' : 'The invoice QR code is still being prepared. Try again in a moment.');
       return;
     }
     setActionLoading(true);
     try {
-      const [html2canvasModule, jspdfModule] = await Promise.all([
-        import('html2canvas'),
+      const [{ jsPDF }, logoDataUrl] = await Promise.all([
         import('jspdf'),
+        imageToDataUrl('/logo.png'),
       ]);
-      const html2canvas = html2canvasModule.default;
-      const { jsPDF } = jspdfModule;
-      const canvas = await html2canvas(invoiceCardRef.current, {
-        backgroundColor: '#050505',
-        scale: Math.min(2, window.devicePixelRatio || 1.5),
-        useCORS: true,
-        allowTaint: false,
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 44;
+      const gold: [number, number, number] = [245, 158, 11];
+      const dark: [number, number, number] = [5, 5, 5];
+      const panel: [number, number, number] = [18, 18, 18];
+      const muted: [number, number, number] = [155, 155, 155];
+      const white: [number, number, number] = [255, 255, 255];
+      const subtotal = completedOrder.items.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+
+      const setText = (rgb: [number, number, number], size: number, style: 'normal' | 'bold' = 'normal') => {
+        pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
+        pdf.setFont('helvetica', style);
+        pdf.setFontSize(size);
+      };
+
+      const drawFrame = () => {
+        pdf.setFillColor(dark[0], dark[1], dark[2]);
+        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+        pdf.setDrawColor(gold[0], gold[1], gold[2]);
+        pdf.setLineWidth(1);
+        pdf.rect(margin - 8, margin - 8, pageWidth - (margin - 8) * 2, pageHeight - (margin - 8) * 2);
+        pdf.setDrawColor(90, 61, 16);
+        pdf.rect(margin - 2, margin - 2, pageWidth - (margin - 2) * 2, pageHeight - (margin - 2) * 2);
+      };
+
+      const addWrapped = (text: string, x: number, y: number, width: number, lineHeight = 13) => {
+        const lines = pdf.splitTextToSize(String(text || ''), width);
+        pdf.text(lines, x, y);
+        return y + lines.length * lineHeight;
+      };
+
+      const ensureSpace = (y: number, needed = 90) => {
+        if (y + needed <= pageHeight - margin) return y;
+        pdf.addPage();
+        drawFrame();
+        return margin + 18;
+      };
+
+      drawFrame();
+      pdf.addImage(logoDataUrl, 'PNG', margin, margin, 54, 54);
+      setText(white, 22);
+      pdf.text('STEVENBMJ', margin + 68, margin + 28);
+      setText(gold, 7, 'bold');
+      pdf.text('HAUTE COUTURE ET JOAILLERIE', margin + 70, margin + 43);
+      setText(gold, 12, 'bold');
+      pdf.text('FACTURE DE PRESTIGE', pageWidth - margin, margin + 18, { align: 'right' });
+      setText(muted, 8);
+      pdf.text(`REF: ${completedOrder.id}`, pageWidth - margin, margin + 34, { align: 'right' });
+      pdf.text(new Date(completedOrder.date).toLocaleString('fr-FR'), pageWidth - margin, margin + 48, { align: 'right' });
+      pdf.setDrawColor(90, 61, 16);
+      pdf.line(margin, margin + 78, pageWidth - margin, margin + 78);
+
+      let y = margin + 112;
+      const columnWidth = (pageWidth - margin * 2 - 22) / 2;
+      pdf.setFillColor(panel[0], panel[1], panel[2]);
+      pdf.roundedRect(margin, y - 18, columnWidth, 102, 4, 4, 'F');
+      pdf.roundedRect(margin + columnWidth + 22, y - 18, columnWidth, 102, 4, 4, 'F');
+
+      setText(gold, 8, 'bold');
+      pdf.text('DESTINATAIRE VIP', margin + 14, y);
+      setText(white, 11, 'bold');
+      pdf.text(String(completedOrder.customerName || '').toUpperCase(), margin + 14, y + 20);
+      setText(muted, 8);
+      pdf.text(`WhatsApp: ${completedOrder.whatsapp}`, margin + 14, y + 37);
+      if (completedOrder.email) pdf.text(`Email: ${completedOrder.email}`, margin + 14, y + 52);
+      addWrapped(`${completedOrder.address}, ${completedOrder.city}`, margin + 14, y + 68, columnWidth - 28, 11);
+
+      setText(gold, 8, 'bold');
+      pdf.text('MAISON DE VENTES', margin + columnWidth + 36, y);
+      setText(white, 10, 'bold');
+      pdf.text('StevenBmj West Africa SARL', margin + columnWidth + 36, y + 20);
+      setText(muted, 8);
+      pdf.text('Siege Cotonou, Benin', margin + columnWidth + 36, y + 37);
+      pdf.text('Contact Concierge: +22955468138', margin + columnWidth + 36, y + 52);
+      pdf.text('Email: stevenbmj202@gmail.com', margin + columnWidth + 36, y + 67);
+
+      y += 128;
+      setText(gold, 8, 'bold');
+      pdf.text('CREATION / SELECTION', margin, y);
+      pdf.text('QTE', pageWidth - margin - 170, y, { align: 'center' });
+      pdf.text('PRIX', pageWidth - margin - 82, y, { align: 'right' });
+      pdf.text('MONTANT', pageWidth - margin, y, { align: 'right' });
+      pdf.setDrawColor(90, 61, 16);
+      pdf.line(margin, y + 9, pageWidth - margin, y + 9);
+      y += 28;
+
+      completedOrder.items.forEach((item: any) => {
+        y = ensureSpace(y, 58);
+        const amount = Number(item.price || 0) * Number(item.quantity || 1);
+        setText(white, 10, 'bold');
+        const nameLines = pdf.splitTextToSize(String(item.productName || 'Creation StevenBmj'), pageWidth - margin * 2 - 210);
+        pdf.text(nameLines, margin, y);
+        let rowBottom = y + nameLines.length * 12;
+        if (item.selectedSize) {
+          setText(gold, 7, 'bold');
+          pdf.text(`TAILLE: ${item.selectedSize}`, margin, rowBottom + 7);
+          rowBottom += 12;
+        }
+        setText(white, 9);
+        pdf.text(String(item.quantity || 1), pageWidth - margin - 170, y, { align: 'center' });
+        pdf.text(formatPrice(Number(item.price || 0)), pageWidth - margin - 82, y, { align: 'right' });
+        pdf.text(formatPrice(amount), pageWidth - margin, y, { align: 'right' });
+        pdf.setDrawColor(42, 42, 42);
+        pdf.line(margin, rowBottom + 9, pageWidth - margin, rowBottom + 9);
+        y = rowBottom + 28;
       });
-      const imageData = canvas.toDataURL('image/png', 1);
-      const pdf = new jsPDF({
-        orientation: canvas.width >= canvas.height ? 'landscape' : 'portrait',
-        unit: 'px',
-        format: [canvas.width, canvas.height],
-      });
-      pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+      if (completedOrder.notes) {
+        y = ensureSpace(y, 58);
+        setText(gold, 8, 'bold');
+        pdf.text("NOTES D'ATELIER", margin, y);
+        setText(muted, 8);
+        y = addWrapped(completedOrder.notes, margin, y + 16, pageWidth - margin * 2, 12) + 12;
+      }
+
+      y = ensureSpace(y, 172);
+      pdf.setDrawColor(90, 61, 16);
+      pdf.line(margin, y, pageWidth - margin, y);
+      y += 28;
+      pdf.addImage(invoiceQrDataUrl, 'PNG', margin, y, 72, 72);
+      setText(gold, 8, 'bold');
+      pdf.text("CERTIFICAT D'AUTHENTICITE", margin + 88, y + 18);
+      setText(muted, 7);
+      addWrapped("Cette facture reprend les informations visibles sur le site et certifie l'ordre de commande StevenBmj.", margin + 88, y + 34, 210, 10);
+
+      const totalsX = pageWidth - margin;
+      setText(muted, 8);
+      pdf.text('Sous-total', totalsX - 130, y + 4);
+      pdf.text(formatPrice(subtotal), totalsX, y + 4, { align: 'right' });
+      pdf.text('Livraison privee', totalsX - 130, y + 22);
+      setText([52, 211, 153], 8, 'bold');
+      pdf.text('Offerte', totalsX, y + 22, { align: 'right' });
+      setText(white, 9, 'bold');
+      pdf.text('TOTAL PAYE', totalsX - 130, y + 48);
+      setText(gold, 17, 'bold');
+      pdf.text(formatPrice(completedOrder.totalPrice), totalsX, y + 50, { align: 'right' });
+      setText(muted, 6);
+      pdf.text('Maison StevenBmj - Cotonou, Benin - Facture generee automatiquement apres validation client.', pageWidth / 2, pageHeight - 24, { align: 'center' });
+
       pdf.save(`facture-stevenbmj-${completedOrder.id}.pdf`);
       clearCart();
       setAppliedPromo(null);
@@ -360,7 +499,7 @@ ${itemsText}
     } catch (error) {
       console.error('PDF generation failed', error);
       alert(language === 'FR'
-        ? "Impossible de générer le PDF automatiquement. Vérifiez que les images sont chargées puis réessayez."
+        ? "Impossible de generer le PDF automatiquement. Verifiez que les images sont chargees puis reessayez."
         : "Unable to generate the PDF automatically. Check that images are loaded and try again."
       );
     } finally {
