@@ -800,7 +800,7 @@ export default function AuthModal() {
                           id="auth-input-fullname"
                           type="text"
                           required
-                          pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                          pattern="[^0-9]{2,}"
                           title={language === 'FR' ? "Le nom et le prenom ne doivent pas contenir de chiffres." : "The first and last name cannot contain numbers."}
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value.replace(/\d/g, ''))}

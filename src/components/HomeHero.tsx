@@ -775,7 +775,7 @@ function ReviewsCarousel() {
                   required
                   value={formName}
                   onChange={(e) => setFormName(e.target.value.replace(/\d/g, ''))}
-                  pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                  pattern="[^0-9]{2,}"
                   title={language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.'}
                   placeholder="Ex: Jean-Louis O."
                   className="w-full bg-neutral-900 border border-white/10 text-xs px-4 py-3 rounded text-white focus:outline-none focus:border-amber-400 font-sans"

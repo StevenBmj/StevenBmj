@@ -159,7 +159,7 @@ export default function ContactUs() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value.replace(/\d/g, ''))}
-                    pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                    pattern="[^0-9]{2,}"
                     title={language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.'}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white rounded focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500/10 placeholder-neutral-700"
                     placeholder="M. Alexander"
