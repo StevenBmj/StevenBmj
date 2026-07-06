@@ -276,9 +276,8 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
     }
   };
 
-  // Automated WhatsApp Message Trigger
-  const handleWhatsAppRedirect = () => {
-    if (!completedOrder) return;
+  const buildWhatsAppUrl = () => {
+    if (!completedOrder) return '';
 
     const waNumber = "22955468138";
     
@@ -309,10 +308,13 @@ ${itemsText}
 ✨ _Ordre enregistré auprès du système de conciergerie StevenBmj d'Afrique de l'Ouest et Internationale. Merci pour votre haute confiance._ ✨`;
 
     const encodedMessage = encodeURIComponent(message);
-    const waUrl = `https://wa.me/${waNumber}?text=${encodedMessage}`;
-    
-    // Redirect now
-    window.open(waUrl, '_blank');
+    return `https://wa.me/${waNumber}?text=${encodedMessage}`;
+  };
+
+  // Automated WhatsApp Message Trigger
+  const handleWhatsAppRedirect = () => {
+    const waUrl = buildWhatsAppUrl();
+    if (waUrl) window.open(waUrl, '_blank');
   };
 
   const handleReturnToEdit = async () => {
@@ -343,6 +345,7 @@ ${itemsText}
       alert(language === 'FR' ? 'Le QR code de la facture est en preparation. Reessayez dans un instant.' : 'The invoice QR code is still being prepared. Try again in a moment.');
       return;
     }
+    const whatsappWindow = window.open('about:blank', '_blank');
     setActionLoading(true);
     try {
       const [{ jsPDF }, logoDataUrl] = await Promise.all([
@@ -495,8 +498,14 @@ ${itemsText}
       clearCart();
       setAppliedPromo(null);
       localStorage.removeItem('sbmj_checkout_draft');
-      window.setTimeout(handleWhatsAppRedirect, 800);
+      const waUrl = buildWhatsAppUrl();
+      if (whatsappWindow && waUrl) {
+        whatsappWindow.location.href = waUrl;
+      } else if (waUrl) {
+        window.location.href = waUrl;
+      }
     } catch (error) {
+      whatsappWindow?.close();
       console.error('PDF generation failed', error);
       alert(language === 'FR'
         ? "Impossible de generer le PDF automatiquement. Verifiez que les images sont chargees puis reessayez."
