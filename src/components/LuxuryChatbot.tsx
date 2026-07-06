@@ -102,7 +102,7 @@ export default function LuxuryChatbot() {
 
       {/* Structured chatbot widget frame */}
       {isOpen && (
-        <div className="w-[22rem] sm:w-[24rem] h-[30rem] bg-neutral-950 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden text-left relative">
+        <div className="w-[calc(100vw-1.5rem)] max-w-[24rem] h-[30rem] max-h-[calc(100vh-7rem)] bg-neutral-950 border border-white/10 rounded-xl shadow-2xl flex flex-col overflow-hidden text-left relative">
           
           {/* Chat header area */}
           <div className="bg-neutral-900 border-b border-white/5 p-4 flex items-center justify-between text-white shrink-0">

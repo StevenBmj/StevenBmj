@@ -51,11 +51,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
     setDeleteError('');
     setDeleteLoading(true);
     try {
-      const res = await fetch('/api/auth/client/delete-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email })
-      });
+      const res = await fetch(`/api/auth/users/${encodeURIComponent(user.id)}`, { method: 'DELETE' });
       const data = await res.json();
       if (res.ok) {
         setIsDeleteConfirmOpen(false);
@@ -261,7 +257,16 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                   id="btn-header-profile"
                   className="flex items-center space-x-1 px-2.5 py-1 text-amber-505 hover:text-amber-400 border border-amber-500/20 bg-amber-500/5 rounded text-[10px] font-mono uppercase tracking-widest duration-300 cursor-pointer text-amber-500 font-bold"
                 >
-                  <User className="w-3.5 h-3.5" />
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-5 h-5 rounded-full object-cover border border-amber-400/40"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <User className="w-3.5 h-3.5" />
+                  )}
                   <span>{user.isAdmin ? (language === 'FR' ? "ADMIN" : "ADMIN") : user.name}</span>
                 </button>
                 
@@ -407,14 +412,28 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             {/* User State */}
             {user ? (
               <div className="space-y-3">
-                <div className="bg-neutral-900/60 p-3 rounded border border-white/5">
-                  <p className="text-[9px] font-mono text-neutral-500 uppercase tracking-widest">
-                    {language === 'FR' ? "VIP CONNECTÉ" : "VIP CONNECTED"}
-                  </p>
-                  <p className="text-sm text-amber-400 font-semibold truncate mt-0.5">{user.name}</p>
-                  <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
-                    {user.isAdmin ? "PRÉROGATIVE ADMIN SUPRÊME" : (language === 'FR' ? "MEMBRE EXCLUSIF VALIDE" : "VALIDATED EXCLUSIVE MEMBER")}
-                  </p>
+                <div className="bg-neutral-900/60 p-3 rounded border border-white/5 flex items-center gap-3">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-10 h-10 rounded-full object-cover border border-amber-400/40"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-neutral-950 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                      <User className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-mono text-neutral-500 uppercase tracking-widest">
+                      {language === 'FR' ? "VIP CONNECTÉ" : "VIP CONNECTED"}
+                    </p>
+                    <p className="text-sm text-amber-400 font-semibold truncate mt-0.5">{user.name}</p>
+                    <p className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                      {user.isAdmin ? "PRÉROGATIVE ADMIN SUPRÊME" : (language === 'FR' ? "MEMBRE EXCLUSIF VALIDE" : "VALIDATED EXCLUSIVE MEMBER")}
+                    </p>
+                  </div>
                 </div>
                 
                 <div className="flex flex-col space-y-2">
@@ -507,12 +526,12 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
       {/* Client Change Password Modal */}
       {isClientChangePasswordOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[10000] grid place-items-center p-4">
           <div 
             onClick={() => setIsClientChangePasswordOpen(false)}
             className="absolute inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
           />
-          <div className="relative bg-neutral-950 border border-white/10 w-full max-w-sm rounded-lg p-6 shadow-2xl z-[111] overflow-hidden">
+          <div className="relative bg-neutral-950 border border-white/10 w-full max-w-sm rounded-lg p-6 shadow-2xl z-[10001] overflow-y-auto max-h-[92vh]">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-600 via-amber-400 to-amber-700" />
             
             <button 

@@ -1375,6 +1375,9 @@ app.post('/api/reviews', rateLimitMiddleware, (req, res) => {
   if (!customerName || !rating || !text) {
     return res.status(400).json({ error: "Tous les champs de l'avis sont obligatoires." });
   }
+  if (/\d/.test(String(customerName))) {
+    return res.status(400).json({ error: "Le nom ne doit pas contenir de chiffres." });
+  }
   
   const newReview = {
     id: `rev-${Date.now()}`,
@@ -1389,6 +1392,37 @@ app.post('/api/reviews', rateLimitMiddleware, (req, res) => {
   addSecurityLog(`Nouvel avis déposé par ${customerName} (Statut: EN ATTENTE DE CONTRÔLE)`, 'SECURED');
   saveDb();
   res.json({ success: true, review: newReview });
+});
+
+app.post('/api/contact', rateLimitMiddleware, async (req, res) => {
+  const name = String(req.body.name || '').trim().replace(/[\u0000-\u001F\u007F]/g, ' ');
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const message = String(req.body.message || '').trim().replace(/[\u0000-\u001F\u007F]/g, ' ');
+  if (!name || !email || !message) return res.status(400).json({ error: 'Tous les champs sont requis.' });
+  if (/\d/.test(name)) return res.status(400).json({ error: 'Le nom ne doit pas contenir de chiffres.' });
+  const html = `<p><strong>Dossier de Prestige StevenBmj</strong></p><p>Nom: ${name}</p><p>Email: ${email}</p><p>${message}</p>`;
+  const sent = await sendCoutureEmail(process.env.CONTACT_EMAIL || process.env.ADMIN_EMAIL || 'stevenbmj202@gmail.com', `Dossier de Prestige StevenBmj - ${email}`, html);
+  if (!sent) return res.status(500).json({ error: "Impossible d'envoyer le message par e-mail." });
+  res.json({ success: true });
+});
+
+app.post('/api/care', rateLimitMiddleware, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const topic = String(req.body.topic || 'Care').trim();
+  const message = String(req.body.message || '').trim().replace(/[\u0000-\u001F\u007F]/g, ' ');
+  if (!email || !message) return res.status(400).json({ error: 'Email et message requis.' });
+  const html = `<p><strong>Ordre d'Information Prive StevenBmj</strong></p><p>Email: ${email}</p><p>Theme: ${topic}</p><p>${message}</p>`;
+  const sent = await sendCoutureEmail(process.env.CONTACT_EMAIL || process.env.ADMIN_EMAIL || 'stevenbmj202@gmail.com', `Ordre d'Information Prive StevenBmj - ${email}`, html);
+  if (!sent) return res.status(500).json({ error: "Impossible d'envoyer le message par e-mail." });
+  res.json({ success: true });
+});
+
+app.post('/api/newsletter', rateLimitMiddleware, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Adresse e-mail invalide.' });
+  const sent = await sendCoutureEmail(process.env.CONTACT_EMAIL || process.env.ADMIN_EMAIL || 'stevenbmj202@gmail.com', 'Nouvelle inscription Salon Prive StevenBmj', `<p>Nouvelle inscription: <strong>${email}</strong></p>`);
+  if (!sent) return res.status(500).json({ error: "Impossible d'enregistrer l'inscription." });
+  res.json({ success: true });
 });
 
 app.put('/api/reviews/:id/approve', (req, res) => {

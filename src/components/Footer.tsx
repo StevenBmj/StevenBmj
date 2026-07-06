@@ -16,13 +16,30 @@ export default function Footer({ setView }: FooterProps) {
   const { language, formatPrice, settings } = useApp();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [activePolicy, setActivePolicy] = useState<'cgv' | 'privacy' | 'legal' | null>(null);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubscribeError('');
     if (email) {
-      setSubscribed(true);
-      setEmail('');
+      setSubscribeLoading(true);
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Erreur d'inscription.");
+        setSubscribed(true);
+        setEmail('');
+      } catch (err: any) {
+        setSubscribeError(err.message || (language === 'FR' ? "Inscription impossible." : 'Subscription failed.'));
+      } finally {
+        setSubscribeLoading(false);
+      }
     }
   };
 
@@ -175,11 +192,17 @@ export default function Footer({ setView }: FooterProps) {
               <button 
                 id="btn-footer-subscribe"
                 type="submit" 
+                disabled={subscribeLoading}
                 className="absolute right-2 px-2.5 py-1 text-neutral-400 hover:text-amber-400 duration-300 cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+          )}
+          {subscribeError && (
+            <p className="text-[10px] text-red-400 font-mono uppercase tracking-widest">
+              {subscribeError}
+            </p>
           )}
         </div>
 
@@ -322,7 +345,7 @@ export default function Footer({ setView }: FooterProps) {
                     </p>
                     <p>
                       <strong>{language === 'FR' ? "Siège social :" : "Physical Showroom:"}</strong> Avenue du Prestige, Quartier Akpakpa, Cotonou, République du Bénin.<br />
-                      <strong>{language === 'FR' ? "Directeur de la Publication :" : "Director of Publication:"}</strong> Steven Amorin.<br />
+                      <strong>{language === 'FR' ? "Directeur de la Publication :" : "Director of Publication:"}</strong> Steven AMORIN.<br />
                       <strong>Contacts :</strong> +229 01 55 46 8138 / 01 44 15 80 44<br />
                       <strong>Email :</strong> <span className="text-amber-400 font-mono">stevenbmj202@gmail.com</span>
                     </p>

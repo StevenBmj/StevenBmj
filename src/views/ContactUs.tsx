@@ -13,6 +13,8 @@ export default function ContactUs() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const titleFr = settings?.contactTitle || "SALON PRIVÉ & SERVICES CONCIERGERIE";
   const titleEn = settings?.contactTitleEn || "PRIVATE VAULT & CONCIERGE SERVICES";
@@ -23,13 +25,32 @@ export default function ContactUs() {
   const activeTitle = language === 'FR' ? titleFr : titleEn;
   const activeAddress = language === 'FR' ? addressFr : addressEn;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    if (/\d/.test(name)) {
+      setError(language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.');
+      return;
+    }
     if (name && email && message) {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Erreur d'envoi.");
       setSubmitted(true);
       setName('');
       setEmail('');
       setMessage('');
+      } catch (err: any) {
+        setError(err.message || (language === 'FR' ? "Impossible d'envoyer le message." : 'Unable to send message.'));
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -129,7 +150,7 @@ export default function ContactUs() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? "Votre Nom *" : "Your Name *"}</label>
                   <input
@@ -137,7 +158,9 @@ export default function ContactUs() {
                     type="text"
                     required
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value.replace(/\d/g, ''))}
+                    pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                    title={language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.'}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white rounded focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500/10 placeholder-neutral-700"
                     placeholder="M. Alexander"
                   />
@@ -169,13 +192,20 @@ export default function ContactUs() {
                 />
               </div>
 
+              {error && (
+                <p className="text-[10px] font-mono text-red-400 uppercase tracking-widest">
+                  {error}
+                </p>
+              )}
+
               <button
                 id="btn-submit-contact"
                 type="submit"
+                disabled={loading}
                 className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-black font-mono text-[10.5px] font-black uppercase tracking-widest rounded cursor-pointer duration-300 flex items-center gap-2"
               >
                 <Send className="w-4 h-4" />
-                <span>{language === 'FR' ? "Envoyer le Message d'Exception" : "Transmit Secure Inquiry"}</span>
+                <span>{loading ? (language === 'FR' ? "Transmission..." : "Sending...") : (language === 'FR' ? "Envoyer le Message d'Exception" : "Transmit Secure Inquiry")}</span>
               </button>
             </form>
           )}

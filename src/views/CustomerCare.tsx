@@ -14,6 +14,8 @@ export default function CustomerCare() {
   const [careMessage, setCareMessage] = useState('');
   const [careEmail, setCareEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const faqs = (() => {
     if (settings && settings.faqsJson) {
@@ -60,12 +62,31 @@ export default function CustomerCare() {
     ];
   })();
 
-  const handleSubmitCare = (e: React.FormEvent) => {
+  const handleSubmitCare = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (careEmail && careMessage) {
-      setSubmitted(true);
-      setCareEmail('');
-      setCareMessage('');
+      setLoading(true);
+      try {
+        const res = await fetch('/api/care', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: careEmail,
+            topic: careTopic,
+            message: careMessage
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Erreur d'envoi.");
+        setSubmitted(true);
+        setCareEmail('');
+        setCareMessage('');
+      } catch (err: any) {
+        setError(err.message || (language === 'FR' ? "Impossible d'envoyer le message." : 'Unable to send message.'));
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -219,13 +240,20 @@ export default function CustomerCare() {
                 />
               </div>
 
+              {error && (
+                <p className="text-[10px] font-mono text-red-400 uppercase tracking-widest">
+                  {error}
+                </p>
+              )}
+
               <button
                 id="btn-submit-care"
                 type="submit"
+                disabled={loading}
                 className="w-full h-11 bg-amber-400 text-black font-mono font-bold tracking-widest text-xs uppercase rounded duration-300 cursor-pointer flex items-center justify-center gap-2 shadow"
               >
                 <Send className="w-4 h-4" />
-                <span>Expédier mon Pli Concierge</span>
+                <span>{loading ? 'Transmission...' : 'Expédier mon Pli Concierge'}</span>
               </button>
 
             </form>

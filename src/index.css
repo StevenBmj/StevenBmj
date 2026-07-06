@@ -7,6 +7,38 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+@media (max-width: 380px) {
+  .tracking-widest {
+    letter-spacing: 0.08em;
+  }
+}
+
 /* Custom fade element transitions */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(12px); }
@@ -114,4 +146,3 @@
     display: none !important;
   }
 }
-

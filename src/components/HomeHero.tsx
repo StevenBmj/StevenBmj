@@ -147,7 +147,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
         <HeroBackground />
 
         {/* Floating cinematic text inside Hero with stagged fade animation */}
-        <div className="relative z-10 mx-auto max-w-5xl px-4 text-center space-y-10">
+        <div className="relative z-10 mx-auto max-w-5xl px-4 text-center space-y-7 sm:space-y-10">
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -155,7 +155,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             className="inline-flex items-center space-x-2.5 bg-neutral-900/80 border border-amber-500/20 px-5 py-2.5 rounded-full backdrop-blur-md"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-amber-300 font-bold">
+            <span className="text-[9px] sm:text-[10px] font-mono uppercase tracking-[0.12em] sm:tracking-[0.25em] text-amber-300 font-bold">
               {settings?.homepageHeroTitle ? (
                 language === 'FR' ? settings.homepageHeroTitle : settings.homepageHeroTitleEn
               ) : (
@@ -165,7 +165,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           </motion.div>
 
           {/* Typewriter Title area */}
-          <h1 className="text-5xl sm:text-7xl md:text-8xl font-sans font-extralight uppercase leading-none min-h-[1.2em]">
+          <h1 className="text-4xl min-[360px]:text-5xl sm:text-7xl md:text-8xl font-sans font-extralight uppercase leading-none min-h-[1.2em] break-words">
             <TypewriterTitle />
           </h1>
           
@@ -173,7 +173,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1, duration: 1.2 }}
-            className="text-xs sm:text-sm font-light text-neutral-400 max-w-2xl mx-auto leading-relaxed uppercase tracking-[0.2em]"
+            className="text-[11px] sm:text-sm font-light text-neutral-400 max-w-2xl mx-auto leading-relaxed uppercase tracking-[0.1em] sm:tracking-[0.2em]"
           >
             {settings?.homepageHeroSubtitle ? (
               language === 'FR' ? settings.homepageHeroSubtitle : settings.homepageHeroSubtitleEn
@@ -193,7 +193,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <button
               id="hero-btn-shop"
               onClick={() => setView('boutique')}
-              className="w-full sm:w-auto px-12 h-14 bg-amber-400 hover:bg-amber-300 text-black text-xs font-black font-mono tracking-widest uppercase duration-300 rounded flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_25px_rgba(217,119,6,0.3)] transition-transform hover:-translate-y-0.5"
+              className="w-full sm:w-auto px-6 sm:px-12 h-14 bg-amber-400 hover:bg-amber-300 text-black text-xs font-black font-mono tracking-widest uppercase duration-300 rounded flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_25px_rgba(217,119,6,0.3)] transition-transform hover:-translate-y-0.5"
             >
               <span>{language === 'FR' ? "Explorer les Salons" : "Explore Exhibition halls"}</span>
               <ArrowRight className="w-4 h-4" />
@@ -201,7 +201,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <button
               id="hero-btn-about"
               onClick={() => setView('about')}
-              className="w-full sm:w-auto px-12 h-14 border border-white/10 bg-neutral-900/60 text-neutral-300 hover:text-white hover:border-amber-400 rounded text-xs font-mono uppercase tracking-widest duration-300 cursor-pointer transition-transform hover:-translate-y-0.5"
+              className="w-full sm:w-auto px-6 sm:px-12 h-14 border border-white/10 bg-neutral-900/60 text-neutral-300 hover:text-white hover:border-amber-400 rounded text-xs font-mono uppercase tracking-widest duration-300 cursor-pointer transition-transform hover:-translate-y-0.5"
             >
               {language === 'FR' ? "L'Histoire de la Maison" : "Our Heritage Story"}
             </button>
@@ -608,6 +608,10 @@ function ReviewsCarousel() {
       setErrorMsg(language === 'FR' ? "Veuillez remplir tous les champs obligatoires." : "Please fill out all required fields.");
       return;
     }
+    if (/\d/.test(formName)) {
+      setErrorMsg(language === 'FR' ? "Le nom ne doit pas contenir de chiffres." : "The name cannot contain numbers.");
+      return;
+    }
     setErrorMsg("");
     setSuccessMsg("");
     setIsSubmitting(true);
@@ -637,7 +641,7 @@ function ReviewsCarousel() {
         setErrorMsg(data.error || "Submission failed.");
       }
     } catch (err) {
-      setErrorMsg("Error submitting review.");
+      setErrorMsg(language === 'FR' ? "Erreur lors de l'envoi de l'avis." : "Error submitting review.");
     } finally {
       setIsSubmitting(false);
     }
@@ -770,7 +774,9 @@ function ReviewsCarousel() {
                   type="text"
                   required
                   value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
+                  onChange={(e) => setFormName(e.target.value.replace(/\d/g, ''))}
+                  pattern="[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}"
+                  title={language === 'FR' ? 'Le nom ne doit pas contenir de chiffres.' : 'The name cannot contain numbers.'}
                   placeholder="Ex: Jean-Louis O."
                   className="w-full bg-neutral-900 border border-white/10 text-xs px-4 py-3 rounded text-white focus:outline-none focus:border-amber-400 font-sans"
                 />

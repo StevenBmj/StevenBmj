@@ -232,7 +232,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
                   ref={canvasRef} 
                   width={340} 
                   height={340} 
-                  className="w-[340px] h-[340px]" 
+                  className="w-[min(340px,82vw)] h-[min(340px,82vw)]" 
                 />
                 <span className="absolute bottom-6 font-mono text-[9px] text-neutral-600 tracking-[0.2em] uppercase">
                   PROJECTION HOLOGRAPHIQUE 3D DISCLOSÉ // CYBER MODEL

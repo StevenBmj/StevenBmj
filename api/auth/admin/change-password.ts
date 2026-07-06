@@ -52,13 +52,15 @@ export default async function handler(req: any, res: any) {
     if (settings.error) throw settings.error;
     const currentSettings = settings.data?.data || {};
     if (currentSettings.adminResetCode !== code) return json(res, 403, { error: 'Le code de sécurité administrateur est invalide.' });
+    const expiresAt = currentSettings.adminResetExpiresAt ? new Date(currentSettings.adminResetExpiresAt).getTime() : 0;
+    if (!expiresAt || Date.now() > expiresAt) return json(res, 403, { error: 'Le code administrateur est expire. Demandez un nouveau code.' });
 
     const authUser = await findAuthUserByEmail(supabase, ADMIN_EMAIL);
     if (!authUser) return json(res, 404, { error: 'Compte administrateur introuvable.' });
     const update = await supabase.auth.admin.updateUserById(authUser.id, { password: newPassword });
     if (update.error) throw update.error;
 
-    const nextSettings = { ...currentSettings, adminPassword: '', adminResetCode: '' };
+    const nextSettings = { ...currentSettings, adminPassword: '', adminResetCode: '', adminResetExpiresAt: '' };
     await supabase.from('app_settings').upsert({ id: 'default', data: nextSettings }, { onConflict: 'id' });
     await supabase.from('profiles').upsert({
       id: authUser.id,

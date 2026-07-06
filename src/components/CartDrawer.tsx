@@ -119,10 +119,10 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
   return (
     <div id="cart-drawer-backdrop" className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-sm">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+        <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10">
           
           <div className="pointer-events-auto w-screen max-w-md border-l border-white/5 bg-neutral-950 text-white">
-            <div className="flex h-full flex-col justify-between overflow-y-auto p-6 text-left">
+            <div className="flex h-full flex-col justify-between overflow-y-auto p-4 sm:p-6 text-left">
               
               {/* Header section */}
               <div>

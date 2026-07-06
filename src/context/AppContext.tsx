@@ -37,6 +37,8 @@ interface AppContextType {
   fetchSettings: () => void;
   appliedPromo: any | null;
   setAppliedPromo: (p: any | null) => void;
+  lastInvoice: any | null;
+  setLastInvoice: (order: any | null) => void;
   user: any | null;
   setUser: (u: any | null) => void;
   logout: () => void;
@@ -61,6 +63,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<any | null>(null);
+  const [lastInvoice, setLastInvoiceState] = useState<any | null>(null);
   const [user, setUserState] = useState<any | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authCallback, setAuthCallback] = useState<(() => void) | null>(null);
@@ -86,6 +89,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCart(JSON.parse(savedCart));
       } catch (e) {
         console.error("Failed to load cart", e);
+      }
+    }
+
+    const savedCartOpen = localStorage.getItem('sbmj_cart_open');
+    if (savedCartOpen === 'true') setCartOpen(true);
+
+    const savedPromo = localStorage.getItem('sbmj_applied_promo');
+    if (savedPromo) {
+      try {
+        setAppliedPromo(JSON.parse(savedPromo));
+      } catch (e) {
+        console.error("Failed to load promo", e);
+      }
+    }
+
+    const savedInvoice = localStorage.getItem('sbmj_last_invoice');
+    if (savedInvoice) {
+      try {
+        setLastInvoiceState(JSON.parse(savedInvoice));
+      } catch (e) {
+        console.error("Failed to load invoice", e);
       }
     }
 
@@ -164,6 +188,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveCart = (newCart: OrderItem[]) => {
     setCart(newCart);
     localStorage.setItem('sbmj_cart', JSON.stringify(newCart));
+  };
+
+  const persistCartOpen = (open: boolean) => {
+    setCartOpen(open);
+    localStorage.setItem('sbmj_cart_open', String(open));
+  };
+
+  const persistAppliedPromo = (promo: any | null) => {
+    setAppliedPromo(promo);
+    if (promo) {
+      localStorage.setItem('sbmj_applied_promo', JSON.stringify(promo));
+    } else {
+      localStorage.removeItem('sbmj_applied_promo');
+    }
+  };
+
+  const setLastInvoice = (order: any | null) => {
+    setLastInvoiceState(order);
+    if (order) {
+      localStorage.setItem('sbmj_last_invoice', JSON.stringify(order));
+    } else {
+      localStorage.removeItem('sbmj_last_invoice');
+    }
   };
 
   const addToCart = (product: Product, quantity: number = 1, size?: string) => {
@@ -314,7 +361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         history,
         addVisited,
         cartOpen,
-        setCartOpen,
+        setCartOpen: persistCartOpen,
         chatOpen,
         setChatOpen,
         vipPoints,
@@ -329,7 +376,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSettings,
         fetchSettings,
         appliedPromo,
-        setAppliedPromo,
+        setAppliedPromo: persistAppliedPromo,
+        lastInvoice,
+        setLastInvoice,
         user,
         setUser,
         logout,

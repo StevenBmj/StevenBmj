@@ -19,6 +19,7 @@ function publicUser(profile: any) {
     id: profile.id,
     name: profile.name,
     email: profile.email,
+    avatarUrl: profile.avatar_url || undefined,
     googleLinked: profile.google_linked,
     vipPoints: profile.vip_points,
     dateJoined: profile.date_joined,

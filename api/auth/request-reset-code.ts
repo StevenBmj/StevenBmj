@@ -65,6 +65,10 @@ export default async function handler(req: any, res: any) {
       if (!profile.data.reset_code || String(profile.data.reset_code).trim() !== submittedCode) {
         return json(res, 403, { error: 'Le code de reinitialisation est incorrect ou expire.' });
       }
+      const expiresAt = profile.data.reset_expires_at ? new Date(profile.data.reset_expires_at).getTime() : 0;
+      if (!expiresAt || Date.now() > expiresAt) {
+        return json(res, 403, { error: 'Le code de reinitialisation est expire. Demandez un nouveau code.' });
+      }
       const update = await supabase.auth.admin.updateUserById(profile.data.id, { password: newPassword });
       if (update.error) throw update.error;
       const cleared = await supabase.from('profiles').update({ reset_code: '', reset_expires_at: null }).eq('email', email);
@@ -76,7 +80,11 @@ export default async function handler(req: any, res: any) {
 
     if (email === ADMIN_EMAIL) {
       const current = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
-      const data = { ...(current.data?.data || {}), adminResetCode: code };
+      const data = {
+        ...(current.data?.data || {}),
+        adminResetCode: code,
+        adminResetExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      };
       const { error } = await supabase.from('app_settings').upsert({ id: 'default', data }, { onConflict: 'id' });
       if (error) throw error;
       await sendCode(email, code);
@@ -87,7 +95,10 @@ export default async function handler(req: any, res: any) {
     if (profile.error) throw profile.error;
     if (!profile.data) return json(res, 404, { error: "Aucun compte client n'existe sous cet identifiant." });
 
-    const { error } = await supabase.from('profiles').update({ reset_code: code }).eq('email', email);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ reset_code: code, reset_expires_at: new Date(Date.now() + 5 * 60_000).toISOString() })
+      .eq('email', email);
     if (error) throw error;
     await sendCode(email, code);
     return json(res, 200, { success: true, message: 'Un code de modification a été transmis à votre adresse e-mail.' });

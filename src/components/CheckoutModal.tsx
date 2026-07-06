@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
-import { ShieldCheck, Truck, Check, HelpCircle, Phone, FileText, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Truck, FileText, ArrowRight, ArrowLeft } from 'lucide-react';
+import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -14,11 +15,13 @@ interface CheckoutModalProps {
 }
 
 export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModalProps) {
-  const { language, cart, formatPrice, clearCart, currency, appliedPromo, setAppliedPromo } = useApp();
+  const { language, cart, formatPrice, clearCart, currency, appliedPromo, setAppliedPromo, lastInvoice, setLastInvoice, user } = useApp();
+  const invoiceCardRef = useRef<HTMLDivElement | null>(null);
 
   // Form states
   const [customerName, setCustomerName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('BJ');
+  const [localPhone, setLocalPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -26,7 +29,33 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
   
   // States of order process
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [completedOrder, setCompletedOrder] = useState<any | null>(null);
+  const [completedOrderState, setCompletedOrderState] = useState<any | null>(() => lastInvoice || null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [invoiceQrDataUrl, setInvoiceQrDataUrl] = useState('');
+  const completedOrder = completedOrderState;
+
+  const countryOptions = useMemo(() => {
+    const displayNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
+      ? new Intl.DisplayNames([language === 'FR' ? 'fr' : 'en'], { type: 'region' })
+      : null;
+    return getCountries()
+      .map((country) => ({
+        country,
+        name: displayNames?.of(country) || country,
+        code: getCountryCallingCode(country),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [language]);
+
+  const fullWhatsapp = useMemo(() => {
+    const digits = localPhone.replace(/\D/g, '');
+    return digits ? `+${getCountryCallingCode(phoneCountry)}${digits}` : '';
+  }, [localPhone, phoneCountry]);
+
+  const updateCompletedOrder = (order: any | null) => {
+    setCompletedOrderState(order);
+    setLastInvoice(order);
+  };
 
   // States for discount coupon validation - prefilled from global appliedPromo!
   const [promoCodeInput, setPromoCodeInput] = useState(appliedPromo?.code || '');
@@ -42,6 +71,83 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
     }
     return null;
   });
+
+  useEffect(() => {
+    if (lastInvoice && !completedOrderState) {
+      setCompletedOrderState(lastInvoice);
+    }
+  }, [lastInvoice, completedOrderState]);
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('sbmj_checkout_draft');
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setCustomerName(draft.customerName || '');
+        setPhoneCountry(draft.phoneCountry || 'BJ');
+        setLocalPhone(String(draft.localPhone || '').replace(/\D/g, ''));
+        setEmail(draft.email || '');
+        setAddress(draft.address || '');
+        setCity(draft.city || '');
+        setNotes(draft.notes || '');
+      } catch (error) {
+        console.error('Failed to restore checkout draft', error);
+      }
+    } else if (user) {
+      setCustomerName((prev) => prev || user.name || '');
+      setEmail((prev) => prev || user.email || '');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (completedOrder) return;
+    localStorage.setItem('sbmj_checkout_draft', JSON.stringify({
+      customerName,
+      phoneCountry,
+      localPhone,
+      email,
+      address,
+      city,
+      notes,
+    }));
+  }, [address, city, completedOrder, customerName, email, localPhone, notes, phoneCountry]);
+
+  useEffect(() => {
+    if (!completedOrder) {
+      setInvoiceQrDataUrl('');
+      return;
+    }
+
+    let cancelled = false;
+    const qrPayload = [
+      'MAISON STEVENBMJ',
+      `Facture de prestige: ${completedOrder.id}`,
+      `Client: ${completedOrder.customerName}`,
+      `Total paye: ${completedOrder.totalPrice} ${completedOrder.currency || currency}`,
+      `Date emission: ${new Date(completedOrder.date).toLocaleDateString('fr-FR')}`,
+      `Achats: ${completedOrder.items.map((it: any) => `${it.quantity}x ${it.productName}`).join(', ')}`,
+      'Authenticite StevenBmj garantie.',
+    ].join('\n');
+
+    import('qrcode')
+      .then((QRCode) => QRCode.toDataURL(qrPayload, {
+        width: 240,
+        margin: 1,
+        color: { dark: '#121212', light: '#ffffff' },
+        errorCorrectionLevel: 'M',
+      }))
+      .then((dataUrl) => {
+        if (!cancelled) setInvoiceQrDataUrl(dataUrl);
+      })
+      .catch((error) => {
+        console.error('Unable to generate invoice QR code', error);
+        if (!cancelled) setInvoiceQrDataUrl('');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [completedOrder, currency]);
 
   const subTotal = useMemo(() => {
     return cart.reduce((acc, item) => {
@@ -115,13 +221,13 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName || !whatsapp || !email || !address || !city) return;
+    if (!customerName || /\d/.test(customerName) || !fullWhatsapp || !email || !address || !city) return;
 
     setIsSubmitting(true);
 
-    const orderPayload = {
+      const orderPayload = {
       customerName,
-      whatsapp,
+      whatsapp: fullWhatsapp,
       email,
       address,
       city,
@@ -146,8 +252,7 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
 
       if (res.ok) {
         const data = await res.json();
-        setCompletedOrder(data.order);
-        clearCart();
+        updateCompletedOrder(data.order);
         if (onOrderSuccess) {
           onOrderSuccess(data.order);
         }
@@ -198,170 +303,73 @@ ${itemsText}
     window.open(waUrl, '_blank');
   };
 
-  const handleDownloadInvoiceAndWhatsApp = () => {
+  const handleReturnToEdit = async () => {
     if (!completedOrder) return;
-    const rows = completedOrder.items.map((item: any) => {
-      const size = item.selectedSize ? ` - Taille: ${item.selectedSize}` : '';
-      return `<tr><td>${item.quantity}x ${item.productName}${size}</td><td style="text-align:right">${formatPrice(item.price * item.quantity)}</td></tr>`;
-    }).join('');
-    const html = `<!doctype html>
-<html lang="fr">
-<head><meta charset="utf-8"><title>Facture StevenBmj ${completedOrder.id}</title></head>
-<body style="font-family:Arial,sans-serif;background:#050505;color:#fff;padding:32px">
-  <main style="max-width:760px;margin:auto;border:2px solid #d97706;padding:28px">
-    <h1 style="color:#fbbf24;letter-spacing:.18em">STEVENBMJ</h1>
-    <h2>Facture ${completedOrder.id}</h2>
-    <p>Date: ${new Date(completedOrder.date).toLocaleString('fr-FR')}</p>
-    <p>Client: ${completedOrder.customerName}</p>
-    <p>Email: ${completedOrder.email || email}</p>
-    <p>WhatsApp: ${completedOrder.whatsapp}</p>
-    <p>Livraison: ${completedOrder.address}, ${completedOrder.city}</p>
-    <table style="width:100%;border-collapse:collapse;margin-top:24px">${rows}</table>
-    <h2 style="text-align:right;color:#fbbf24">Total: ${formatPrice(completedOrder.totalPrice)}</h2>
-  </main>
-</body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `facture-stevenbmj-${completedOrder.id}.html`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    window.setTimeout(handleWhatsAppRedirect, 900);
+    const order = completedOrder;
+    setCustomerName(order.customerName || '');
+    setEmail(order.email || email || '');
+    setAddress(order.address || '');
+    setCity(order.city || '');
+    setNotes(order.notes || '');
+    const digits = String(order.whatsapp || '').replace(/\D/g, '');
+    const matchedCountry = countryOptions.find((option) => digits.startsWith(option.code));
+    if (matchedCountry) {
+      setPhoneCountry(matchedCountry.country);
+      setLocalPhone(digits.slice(matchedCountry.code.length));
+    }
+    updateCompletedOrder(null);
+    try {
+      await fetch(`/api/orders/${encodeURIComponent(order.id)}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Unable to delete draft order before editing', error);
+    }
   };
 
-  const handlePrintInvoice = () => {
-    if (!completedOrder) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Veuillez autoriser les fenêtres contextuelles (popups) pour imprimer la facture.");
+  const handleDownloadInvoiceAndWhatsApp = async () => {
+    if (!completedOrder || !invoiceCardRef.current) return;
+    if (!invoiceQrDataUrl) {
+      alert(language === 'FR' ? 'Le QR code de la facture est en préparation. Réessayez dans un instant.' : 'The invoice QR code is still being prepared. Try again in a moment.');
       return;
     }
-    
-    const invoiceHtml = `
-      <html>
-        <head>
-          <title>Facture StevenBmj - Reference: ${completedOrder.id}</title>
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-          <style>
-            @media print {
-              body {
-                background-color: #000000 !important;
-                color: #ffffff !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              .print-container {
-                background-color: #050505 !important;
-                border-color: #fbbf24 !important;
-              }
-              .text-gold {
-                color: #fbbf24 !important;
-              }
-            }
-            body { background-color: #000000; color: #ffffff; font-family: sans-serif; padding: 40px; }
-            .print-container { max-width: 800px; margin: 0 auto; border: 4px double rgba(251, 191, 36, 0.4); padding: 35px; border-radius: 8px; background-color: #050505; }
-            .font-mono { font-family: monospace; }
-          </style>
-        </head>
-        <body>
-          <div class="print-container">
-            <div class="flex justify-between items-center border-b border-yellow-500/30 pb-6 mb-6">
-              <div class="flex items-center space-x-3">
-                <img src="/logo.png" alt="StevenBmj" width="60" height="60" style="width:60px;height:60px;border-radius:9999px;object-fit:cover;" />
-                <div style="text-align: left; margin-left: 10px;">
-                  <div style="font-size: 24px; color: #fbbf24; font-weight: 300; letter-spacing: 0.25em; font-family: sans-serif; text-transform: uppercase; line-height: 1;">StevenBmj</div>
-                  <div style="font-size: 7px; color: #a3a3a3; font-weight: 600; letter-spacing: 0.35em; font-family: monospace; text-transform: uppercase; margin-top: 3px;">HAUTE COUTURE & JOAILLERIE</div>
-                </div>
-              </div>
-              <div class="text-right text-xs font-mono">
-                <p class="font-bold text-yellow-400 text-sm tracking-widest">REÇU DE FACTURATION ACQUITTÉ</p>
-                <p class="text-neutral-400">RÉF: ${completedOrder.id}</p>
-                <p class="text-neutral-400">DATE: ${new Date(completedOrder.date).toLocaleDateString('fr-FR')} ${new Date(completedOrder.date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</p>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-6 text-xs mb-6 pb-6 border-b border-white/5">
-              <div>
-                <h3 class="text-yellow-500 font-bold uppercase mb-2 font-mono tracking-widest">Destinataire VIP</h3>
-                <p class="font-bold uppercase text-sm text-white">${completedOrder.customerName}</p>
-                <p class="text-gray-400">WhatsApp: ${completedOrder.whatsapp}</p>
-                <p class="text-gray-400">Adresse: ${completedOrder.address}, ${completedOrder.city}</p>
-                ${completedOrder.notes ? `<p class="italic text-gray-500 mt-2 font-sans">Notes d'atelier: ${completedOrder.notes}</p>` : ''}
-              </div>
-              <div class="text-right">
-                <h3 class="text-yellow-500 font-bold uppercase mb-2 font-mono tracking-widest">Maison de Ventes</h3>
-                <p class="font-bold text-white">StevenBmj East Africa SARL</p>
-                <p class="text-gray-400">Siège Cotonou, Bénin</p>
-                <p class="text-gray-400">Avenue du Prestige, Akpakpa</p>
-                <p class="font-mono text-neutral-300">Concierge: +22955468138</p>
-              </div>
-            </div>
-
-            <table class="w-full text-left text-xs mb-6 border-collapse">
-              <thead>
-                <tr class="border-b border-yellow-500/30 font-mono text-gray-400 uppercase tracking-widest text-[9px]">
-                  <th class="pb-3 text-left">SÉLECTION / CRÉATION</th>
-                  <th class="pb-3 text-center">QUANTITÉ</th>
-                  <th class="pb-3 text-right">PRIX UNITAIRE</th>
-                  <th class="pb-3 text-right">MONTANT TOTAL</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-white/5 font-mono text-xs text-neutral-300">
-                ${completedOrder.items.map((item: any) => `
-                  <tr>
-                    <td class="py-4">
-                      <p class="font-sans font-bold text-sm text-white">${item.productName}</p>
-                      ${item.selectedSize ? `<p class="text-[10px] text-yellow-500">Taille: ${item.selectedSize}</p>` : ''}
-                    </td>
-                    <td class="py-4 text-center text-white">${item.quantity}</td>
-                    <td class="py-4 text-right">${item.price.toLocaleString('fr-FR')} €</td>
-                    <td class="py-4 text-right font-bold text-white">${(item.price * item.quantity).toLocaleString('fr-FR')} €</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <div class="flex justify-between items-center border-t border-yellow-500/30 pt-6">
-              <div class="flex items-center space-x-4">
-                <img
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=d97706&bgcolor=050505&data=${encodeURIComponent(
-                    `REÇU SOUVERAIN N° ${completedOrder.id}\nCLIENT: ${completedOrder.customerName}\nTOTAL: ${completedOrder.totalPrice.toLocaleString('fr-FR')} EUR\nSTEVENBMJ AUTHENTICITY GUARANTEED`
-                  )}"
-                  class="w-16 h-16 object-contain border border-yellow-500/20 p-1 bg-black"
-                />
-                <div class="text-left font-mono">
-                  <p class="text-[9px] text-yellow-500 font-bold tracking-wider">CERTIFICAT SBMJ</p>
-                  <p class="text-[8px] text-gray-500 leading-tight">Cet achat est scellé sous le label de prestige StevenBmj.</p>
-                </div>
-              </div>
-              <div class="text-right font-mono">
-                <p class="text-xs text-neutral-400 font-bold">LIVRAISON PRIVÉE SBMJ : <span class="text-emerald-400 font-bold font-sans">INCLUSE</span></p>
-                <p class="text-xs text-neutral-300 mt-1">MONTANT PAYÉ APPRÉCIÉ :</p>
-                <p class="text-xl font-bold text-yellow-500">${completedOrder.totalPrice.toLocaleString('fr-FR')} €</p>
-              </div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 400);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-    
-    printWindow.document.write(invoiceHtml);
-    printWindow.document.close();
+    setActionLoading(true);
+    try {
+      const [html2canvasModule, jspdfModule] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      const html2canvas = html2canvasModule.default;
+      const { jsPDF } = jspdfModule;
+      const canvas = await html2canvas(invoiceCardRef.current, {
+        backgroundColor: '#050505',
+        scale: Math.min(2, window.devicePixelRatio || 1.5),
+        useCORS: true,
+        allowTaint: false,
+      });
+      const imageData = canvas.toDataURL('image/png', 1);
+      const pdf = new jsPDF({
+        orientation: canvas.width >= canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height],
+      });
+      pdf.addImage(imageData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`facture-stevenbmj-${completedOrder.id}.pdf`);
+      clearCart();
+      setAppliedPromo(null);
+      localStorage.removeItem('sbmj_checkout_draft');
+      window.setTimeout(handleWhatsAppRedirect, 800);
+    } catch (error) {
+      console.error('PDF generation failed', error);
+      alert(language === 'FR'
+        ? "Impossible de générer le PDF automatiquement. Vérifiez que les images sont chargées puis réessayez."
+        : "Unable to generate the PDF automatically. Check that images are loaded and try again."
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md p-4 md:p-8 flex justify-center items-start">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md p-2 sm:p-4 md:p-8 flex justify-center items-start">
       <div className="relative w-full max-w-4xl bg-neutral-950 border border-white/10 rounded-lg shadow-2xl overflow-hidden text-left my-4 md:my-8">
         
         {/* Close Button unless checked out */}
@@ -415,17 +423,40 @@ ${itemsText}
                 {/* WhatsApp Phone */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">
-                    {language === 'FR' ? 'Numéro WhatsApp (Complet) *' : 'WhatsApp Number (With Country Code) *'}
+                    {language === 'FR' ? 'Pays et Numéro WhatsApp *' : 'Country and WhatsApp Number *'}
                   </label>
-                  <input
-                    id="checkout-whatsapp"
-                    type="tel"
-                    required
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="+229 55 46 81 38"
-                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white focus:outline-none focus:border-amber-400 rounded focus:ring-1 focus:ring-amber-500/10"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-[1.3fr_1fr] gap-2">
+                    <select
+                      id="checkout-phone-country"
+                      value={phoneCountry}
+                      onChange={(e) => {
+                        setPhoneCountry(e.target.value as CountryCode);
+                        setLocalPhone('');
+                      }}
+                      className="w-full bg-neutral-900 border border-white/10 text-xs px-3 py-3 text-white focus:outline-none focus:border-amber-400 rounded"
+                    >
+                      {countryOptions.map((option) => (
+                        <option key={option.country} value={option.country}>
+                          {option.name} (+{option.code})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 bg-neutral-950 border border-r-0 border-white/10 rounded-l text-[11px] font-mono text-amber-400">
+                        +{getCountryCallingCode(phoneCountry)}
+                      </span>
+                      <input
+                        id="checkout-whatsapp"
+                        type="tel"
+                        inputMode="numeric"
+                        required
+                        value={localPhone}
+                        onChange={(e) => setLocalPhone(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                        placeholder="55468138"
+                        className="min-w-0 w-full bg-neutral-900 border border-white/10 text-xs px-3 py-3 text-white focus:outline-none focus:border-amber-400 rounded-r focus:ring-1 focus:ring-amber-500/10"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Email Address */}
@@ -445,7 +476,7 @@ ${itemsText}
                 </div>
 
                 {/* City & Location */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">
                       {language === 'FR' ? 'Ville / District *' : 'City / State *'}
@@ -607,10 +638,14 @@ ${itemsText}
           </div>
         ) : (
           // State 2: Order Complete, showing the Gorgeous Black and Gold Luxury Invoice!
-          <div id="print-area" className="p-6 md:p-12 space-y-8 bg-black text-white selection:bg-amber-500/20">
+          <div id="print-area" className="p-4 sm:p-6 md:p-12 space-y-8 bg-black text-white selection:bg-amber-500/20">
             
             {/* The Luxury Double Border Invoice Card */}
-            <div className="border-4 border-double border-amber-500/30 p-8 rounded bg-neutral-950 tracking-wide relative">
+            <div
+              id="invoice-card"
+              ref={invoiceCardRef}
+              className="border-4 border-double border-amber-500/30 p-4 sm:p-6 md:p-8 rounded bg-neutral-950 tracking-wide relative"
+            >
               
               {/* Gold watermark design element in background */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.02] pointer-events-none">
@@ -698,19 +733,20 @@ ${itemsText}
               </div>
 
               {/* Calculations and Visual Signature QR Code bottom */}
-              <div className="border-t border-amber-500/20 pt-6 flex flex-col md:flex-row md:justify-between gap-8 items-center">
+              <div className="border-t border-amber-500/20 pt-6 flex flex-col md:flex-row md:justify-between gap-6 md:gap-8 items-stretch md:items-center">
                 
                 {/* Simulated luxury certificate signature stamp */}
                 <div className="flex items-center space-x-4 bg-neutral-900/60 p-4 border border-white/5 rounded">
                   <div className="w-16 h-16 bg-white p-1 rounded inline-block shrink-0 flex items-center justify-center">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=121212&bgcolor=ffffff&data=${encodeURIComponent(
-                        `MAISON STEVENBMJ\nFacture de prestige: ${completedOrder.id}\nClient: ${completedOrder.customerName}\nTotal paye: ${completedOrder.totalPrice} EUR\nDate d'emission: ${new Date(completedOrder.date).toLocaleDateString('fr-FR')}\nAchats: ${completedOrder.items.map((it: any) => `${it.quantity}x ${it.productName}`).join(', ')}\nMerci de votre haute confiance.`
-                      )}`}
-                      alt="QR Code Facture Souveraine"
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
+                    {invoiceQrDataUrl ? (
+                      <img
+                        src={invoiceQrDataUrl}
+                        alt="QR Code Facture Souveraine"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-[9px] text-neutral-700 font-mono text-center">QR</span>
+                    )}
                   </div>
                   <div className="text-left">
                     <p className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider">
@@ -724,7 +760,7 @@ ${itemsText}
                   </div>
                 </div>
 
-                <div className="text-right text-sm space-y-1.5 min-w-[15rem] font-mono">
+                <div className="text-right text-sm space-y-1.5 w-full md:min-w-[15rem] font-mono">
                   <div className="flex justify-between text-neutral-500">
                     <span>{language === 'FR' ? 'Expédition de valeur :' : 'Valued shipping :'}</span>
                     <span className="text-white">{language === 'FR' ? 'Gratuit' : 'Complimentary'}</span>
@@ -739,25 +775,33 @@ ${itemsText}
 
             </div>
 
-            {/* Quick action buttons row: print, WhatsApp direct dispatch */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center mt-6">
-              
+            {/* Action row: edit or finalize with one combined PDF + WhatsApp action */}
+            <div className="flex flex-col items-center justify-center gap-4 text-center mt-6">
               <button
-                id="btn-print-invoice-complete"
-                onClick={handleDownloadInvoiceAndWhatsApp}
-                className="px-6 h-12 border border-white/20 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded text-xs font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                type="button"
+                onClick={handleReturnToEdit}
+                className="px-4 h-10 border border-white/10 bg-neutral-950 text-neutral-400 hover:text-white hover:border-white/25 rounded text-[10px] font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer"
               >
-                <FileText className="w-4 h-4" />
-                <span>{language === 'FR' ? 'Telecharger facture puis WhatsApp' : 'Download invoice then WhatsApp'}</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>{language === 'FR' ? 'Retour modifier les informations' : 'Back to edit details'}</span>
               </button>
 
               <button
-                id="btn-redirect-whatsapp-order"
-                onClick={handleWhatsAppRedirect}
-                className="px-8 h-12 bg-amber-400 text-black hover:bg-amber-300 rounded text-xs font-black font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center animate-pulse"
+                id="btn-print-invoice-complete"
+                onClick={handleDownloadInvoiceAndWhatsApp}
+                disabled={actionLoading || !invoiceQrDataUrl}
+                className="px-6 sm:px-8 h-12 bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-60 rounded text-xs font-black font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full max-w-xl justify-center shadow-[0_12px_30px_rgba(217,119,6,0.18)]"
               >
-                <Phone className="w-4 h-4" />
-                <span>{language === 'FR' ? 'Envoyer ma commande sur WhatsApp' : 'Send My Order on WhatsApp'}</span>
+                {!invoiceQrDataUrl ? (
+                  <span>{language === 'FR' ? 'Préparation du QR...' : 'Preparing QR...'}</span>
+                ) : actionLoading ? (
+                  <span>{language === 'FR' ? 'Préparation du PDF...' : 'Preparing PDF...'}</span>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4" />
+                    <span>{language === 'FR' ? 'Télécharger la facture et envoyer via WhatsApp' : 'Download invoice and send via WhatsApp'}</span>
+                  </>
+                )}
                 <ArrowRight className="w-4 h-4" />
               </button>
 

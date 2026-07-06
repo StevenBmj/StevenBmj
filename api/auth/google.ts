@@ -31,6 +31,7 @@ function publicUser(profile: any) {
     id: profile.id,
     name: profile.name,
     email: profile.email,
+    avatarUrl: profile.avatar_url || undefined,
     googleLinked: profile.google_linked,
     vipPoints: profile.vip_points,
     isAdmin: profile.is_admin,
@@ -59,6 +60,7 @@ async function verifyGoogleCredential(credential: string) {
   return {
     email: String(payload.email).trim().toLowerCase(),
     name: String(payload.name || payload.email.split('@')[0]).trim(),
+    picture: String(payload.picture || '').trim(),
   };
 }
 
@@ -90,6 +92,7 @@ export default async function handler(req: any, res: any) {
         id: auth.data.user.id,
         name: googleUser.name,
         email,
+        avatar_url: googleUser.picture || null,
         google_linked: true,
         vip_points: email === ADMIN_EMAIL ? 99999 : 200,
         is_admin: email === ADMIN_EMAIL,
@@ -108,7 +111,7 @@ export default async function handler(req: any, res: any) {
     } else {
       const updated = await supabase
         .from('profiles')
-        .update({ google_linked: true, is_confirmed: true, activation_code: '', activation_expires_at: null })
+        .update({ google_linked: true, is_confirmed: true, avatar_url: googleUser.picture || null, activation_code: '', activation_expires_at: null })
         .eq('email', email)
         .select('*')
         .single();

@@ -23,12 +23,36 @@ import AuthModal from './components/AuthModal';
 import { Product } from './types';
 
 function AppInner() {
-  const { language, hasIntroPlayed, setHasIntroPlayed, triggerAuthRequired } = useApp();
+  const { language, hasIntroPlayed, setHasIntroPlayed, triggerAuthRequired, lastInvoice } = useApp();
   
   // Custom router state: 'home' | 'boutique' | 'aide' | 'god' | 'produit'
   const [currentView, setCurrentView] = useState<string>('home');
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
+
+  useEffect(() => {
+    const savedView = localStorage.getItem('sbmj_current_view');
+    if (savedView && savedView !== 'produit') {
+      setCurrentView(savedView);
+    }
+    if (localStorage.getItem('sbmj_checkout_open') === 'true' || localStorage.getItem('sbmj_last_invoice')) {
+      setShowCheckout(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentView !== 'produit') {
+      localStorage.setItem('sbmj_current_view', currentView);
+    }
+  }, [currentView]);
+
+  useEffect(() => {
+    if (showCheckout || lastInvoice) {
+      localStorage.setItem('sbmj_checkout_open', 'true');
+    } else {
+      localStorage.removeItem('sbmj_checkout_open');
+    }
+  }, [showCheckout, lastInvoice]);
 
   // Monitor url matching '/god' for professional and confidential routing
   useEffect(() => {
@@ -138,7 +162,10 @@ function AppInner() {
       {/* 7. Signature billing and checkout dialog overlay */}
       {showCheckout && (
         <CheckoutModal 
-          onClose={() => setShowCheckout(false)} 
+          onClose={() => {
+            localStorage.removeItem('sbmj_checkout_open');
+            setShowCheckout(false);
+          }} 
           onOrderSuccess={handleOrderSubmitted}
         />
       )}

@@ -90,6 +90,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text not null unique,
+  avatar_url text,
   google_linked boolean not null default false,
   vip_points integer not null default 0,
   is_admin boolean not null default false,
@@ -105,6 +106,7 @@ create table if not exists public.profiles (
 
 alter table public.profiles add column if not exists activation_expires_at timestamptz;
 alter table public.profiles add column if not exists reset_expires_at timestamptz;
+alter table public.profiles add column if not exists avatar_url text;
 
 create or replace function public.set_updated_at()
 returns trigger as $$
