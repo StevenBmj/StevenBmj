@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase();
 
 function isValidPersonName(value: string) {
-  return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}$/.test(value.trim()) && !/\d/.test(value);
+  return /^[\p{L}' -]{2,80}$/u.test(value.trim()) && !/\d/.test(value);
 }
 
 function generateActivationCode() {
@@ -33,6 +33,20 @@ async function readBody(req: any) {
   for await (const chunk of req) chunks.push(Buffer.from(chunk));
   const raw = Buffer.concat(chunks).toString('utf-8');
   return raw ? JSON.parse(raw) : {};
+}
+
+async function findAuthUserByEmail(supabase: any, email: string) {
+  const target = email.trim().toLowerCase();
+  let page = 1;
+  while (page < 20) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const found = data.users.find((user: any) => String(user.email || '').toLowerCase() === target);
+    if (found) return found;
+    if (data.users.length < 1000) break;
+    page += 1;
+  }
+  return null;
 }
 
 function publicUser(profile: any) {
@@ -85,7 +99,12 @@ export default async function handler(req: any, res: any) {
     const supabase = supabaseAdmin();
     const existing = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
     if (existing.error) throw existing.error;
-    if (existing.data) return json(res, 400, { error: 'Cette adresse e-mail est déjà enregistrée.' });
+    if (existing.data) return json(res, 409, { error: 'Cette adresse e-mail est deja utilisee. Connectez-vous ou utilisez Mot de passe oublie.' });
+
+    const existingAuthUser = await findAuthUserByEmail(supabase, email);
+    if (existingAuthUser) {
+      return json(res, 409, { error: 'Cette adresse e-mail est deja liee a un compte. Connectez-vous ou utilisez Mot de passe oublie.' });
+    }
 
     const isAdmin = email === ADMIN_EMAIL;
     const activationCode = isAdmin ? '' : generateActivationCode();

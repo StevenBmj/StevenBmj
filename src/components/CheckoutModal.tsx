@@ -181,6 +181,26 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
     return Math.max(0, subTotal - discountAmount + shippingCost);
   }, [subTotal, discountAmount, shippingCost]);
 
+  const invoiceBreakdown = useMemo(() => {
+    if (!completedOrder) return null;
+    const invoiceSubtotal = completedOrder.items.reduce((sum: number, item: any) => {
+      return sum + Number(item.price || 0) * Number(item.quantity || 1);
+    }, 0);
+    const promoMatch = String(completedOrder.notes || '').match(/Code Promo:\s*([A-Z0-9_-]+)\s*-(\d+)%/i);
+    const discountPercent = activeDiscount || Number(promoMatch?.[2] || 0);
+    const invoiceDiscount = discountPercent > 0
+      ? Math.round((invoiceSubtotal * discountPercent) / 100)
+      : Math.max(0, invoiceSubtotal - Number(completedOrder.totalPrice || 0));
+    const invoiceShipping = Math.max(0, Number(completedOrder.totalPrice || 0) - (invoiceSubtotal - invoiceDiscount));
+    return {
+      subtotal: invoiceSubtotal,
+      discountAmount: invoiceDiscount,
+      discountPercent,
+      shippingCost: invoiceShipping,
+      promoCode: promoCodeInput || promoMatch?.[1] || appliedPromo?.code || '',
+    };
+  }, [activeDiscount, appliedPromo, completedOrder, promoCodeInput]);
+
   const handleApplyPromo = async () => {
     if (!promoCodeInput) return;
     try {
@@ -362,7 +382,11 @@ ${itemsText}
       const panel: [number, number, number] = [18, 18, 18];
       const muted: [number, number, number] = [155, 155, 155];
       const white: [number, number, number] = [255, 255, 255];
-      const subtotal = completedOrder.items.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+      const subtotal = invoiceBreakdown?.subtotal ?? completedOrder.items.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
+      const orderDiscountAmount = invoiceBreakdown?.discountAmount ?? 0;
+      const orderShippingCost = invoiceBreakdown?.shippingCost ?? 0;
+      const orderPromoCode = invoiceBreakdown?.promoCode || '';
+      const pdfCopy = (fr: string, en: string) => language === 'FR' ? fr : en;
 
       const setText = (rgb: [number, number, number], size: number, style: 'normal' | 'bold' = 'normal') => {
         pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
@@ -386,6 +410,12 @@ ${itemsText}
         return y + lines.length * lineHeight;
       };
 
+      const addClamped = (text: string, x: number, y: number, width: number, lineHeight = 11, maxLines = 2) => {
+        const lines = pdf.splitTextToSize(String(text || ''), width).slice(0, maxLines);
+        pdf.text(lines, x, y);
+        return y + lines.length * lineHeight;
+      };
+
       const ensureSpace = (y: number, needed = 90) => {
         if (y + needed <= pageHeight - margin) return y;
         pdf.addPage();
@@ -398,45 +428,45 @@ ${itemsText}
       setText(white, 22);
       pdf.text('STEVENBMJ', margin + 68, margin + 28);
       setText(gold, 7, 'bold');
-      pdf.text('HAUTE COUTURE ET JOAILLERIE', margin + 70, margin + 43);
+      pdf.text(pdfCopy('HAUTE COUTURE ET JOAILLERIE', 'HAUTE COUTURE AND FINE JEWELRY'), margin + 70, margin + 43);
       setText(gold, 12, 'bold');
-      pdf.text('FACTURE DE PRESTIGE', pageWidth - margin, margin + 18, { align: 'right' });
+      pdf.text(pdfCopy('FACTURE DE PRESTIGE', 'PRESTIGE INVOICE'), pageWidth - margin, margin + 18, { align: 'right' });
       setText(muted, 8);
       pdf.text(`REF: ${completedOrder.id}`, pageWidth - margin, margin + 34, { align: 'right' });
-      pdf.text(new Date(completedOrder.date).toLocaleString('fr-FR'), pageWidth - margin, margin + 48, { align: 'right' });
+      pdf.text(new Date(completedOrder.date).toLocaleString(language === 'FR' ? 'fr-FR' : 'en-US'), pageWidth - margin, margin + 48, { align: 'right' });
       pdf.setDrawColor(90, 61, 16);
       pdf.line(margin, margin + 78, pageWidth - margin, margin + 78);
 
       let y = margin + 112;
       const columnWidth = (pageWidth - margin * 2 - 22) / 2;
       pdf.setFillColor(panel[0], panel[1], panel[2]);
-      pdf.roundedRect(margin, y - 18, columnWidth, 102, 4, 4, 'F');
-      pdf.roundedRect(margin + columnWidth + 22, y - 18, columnWidth, 102, 4, 4, 'F');
+      pdf.roundedRect(margin, y - 18, columnWidth, 118, 4, 4, 'F');
+      pdf.roundedRect(margin + columnWidth + 22, y - 18, columnWidth, 118, 4, 4, 'F');
 
       setText(gold, 8, 'bold');
-      pdf.text('DESTINATAIRE VIP', margin + 14, y);
+      pdf.text(pdfCopy('DESTINATAIRE VIP', 'VIP RECIPIENT'), margin + 14, y);
       setText(white, 11, 'bold');
-      pdf.text(String(completedOrder.customerName || '').toUpperCase(), margin + 14, y + 20);
+      let buyerY = addClamped(String(completedOrder.customerName || '').toUpperCase(), margin + 14, y + 20, columnWidth - 28, 12, 2);
       setText(muted, 8);
-      pdf.text(`WhatsApp: ${completedOrder.whatsapp}`, margin + 14, y + 37);
-      if (completedOrder.email) pdf.text(`Email: ${completedOrder.email}`, margin + 14, y + 52);
-      addWrapped(`${completedOrder.address}, ${completedOrder.city}`, margin + 14, y + 68, columnWidth - 28, 11);
+      buyerY = addClamped(`WhatsApp: ${completedOrder.whatsapp}`, margin + 14, buyerY + 3, columnWidth - 28, 11, 1);
+      if (completedOrder.email) buyerY = addClamped(`Email: ${completedOrder.email}`, margin + 14, buyerY + 2, columnWidth - 28, 11, 2);
+      addClamped(`${completedOrder.address}, ${completedOrder.city}`, margin + 14, buyerY + 2, columnWidth - 28, 11, 2);
 
       setText(gold, 8, 'bold');
-      pdf.text('MAISON DE VENTES', margin + columnWidth + 36, y);
+      pdf.text(pdfCopy('MAISON DE VENTES', 'RETAIL HOUSE'), margin + columnWidth + 36, y);
       setText(white, 10, 'bold');
       pdf.text('StevenBmj West Africa SARL', margin + columnWidth + 36, y + 20);
       setText(muted, 8);
-      pdf.text('Siege Cotonou, Benin', margin + columnWidth + 36, y + 37);
-      pdf.text('Contact Concierge: +22955468138', margin + columnWidth + 36, y + 52);
+      pdf.text(pdfCopy('Siege Cotonou, Benin', 'HQ Cotonou, Benin'), margin + columnWidth + 36, y + 37);
+      pdf.text(pdfCopy('Contact Concierge: +22955468138', 'Concierge Desk: +22955468138'), margin + columnWidth + 36, y + 52);
       pdf.text('Email: stevenbmj202@gmail.com', margin + columnWidth + 36, y + 67);
 
-      y += 128;
+      y += 144;
       setText(gold, 8, 'bold');
-      pdf.text('CREATION / SELECTION', margin, y);
-      pdf.text('QTE', pageWidth - margin - 170, y, { align: 'center' });
-      pdf.text('PRIX', pageWidth - margin - 82, y, { align: 'right' });
-      pdf.text('MONTANT', pageWidth - margin, y, { align: 'right' });
+      pdf.text(pdfCopy('CREATION / SELECTION', 'CREATION / SELECTION'), margin, y);
+      pdf.text(pdfCopy('QTE', 'QTY'), pageWidth - margin - 170, y, { align: 'center' });
+      pdf.text(pdfCopy('PRIX', 'UNIT'), pageWidth - margin - 82, y, { align: 'right' });
+      pdf.text(pdfCopy('MONTANT', 'AMOUNT'), pageWidth - margin, y, { align: 'right' });
       pdf.setDrawColor(90, 61, 16);
       pdf.line(margin, y + 9, pageWidth - margin, y + 9);
       y += 28;
@@ -450,10 +480,10 @@ ${itemsText}
         let rowBottom = y + nameLines.length * 12;
         if (item.selectedSize) {
           setText(gold, 7, 'bold');
-          pdf.text(`TAILLE: ${item.selectedSize}`, margin, rowBottom + 7);
+          pdf.text(`${pdfCopy('TAILLE', 'SIZE')}: ${item.selectedSize}`, margin, rowBottom + 7);
           rowBottom += 12;
         }
-        setText(white, 9);
+        setText(white, 8);
         pdf.text(String(item.quantity || 1), pageWidth - margin - 170, y, { align: 'center' });
         pdf.text(formatPrice(Number(item.price || 0)), pageWidth - margin - 82, y, { align: 'right' });
         pdf.text(formatPrice(amount), pageWidth - margin, y, { align: 'right' });
@@ -465,34 +495,57 @@ ${itemsText}
       if (completedOrder.notes) {
         y = ensureSpace(y, 58);
         setText(gold, 8, 'bold');
-        pdf.text("NOTES D'ATELIER", margin, y);
+        pdf.text(pdfCopy("NOTES D'ATELIER", 'ATELIER NOTES'), margin, y);
         setText(muted, 8);
         y = addWrapped(completedOrder.notes, margin, y + 16, pageWidth - margin * 2, 12) + 12;
       }
 
-      y = ensureSpace(y, 172);
+      y = ensureSpace(y, 188);
       pdf.setDrawColor(90, 61, 16);
       pdf.line(margin, y, pageWidth - margin, y);
       y += 28;
       pdf.addImage(invoiceQrDataUrl, 'PNG', margin, y, 72, 72);
       setText(gold, 8, 'bold');
-      pdf.text("CERTIFICAT D'AUTHENTICITE", margin + 88, y + 18);
+      pdf.text(pdfCopy("CERTIFICAT D'AUTHENTICITE", 'CERTIFICATE OF AUTHENTICITY'), margin + 88, y + 18);
       setText(muted, 7);
-      addWrapped("Cette facture reprend les informations visibles sur le site et certifie l'ordre de commande StevenBmj.", margin + 88, y + 34, 210, 10);
+      addWrapped(
+        pdfCopy(
+          "Cette facture reprend les informations visibles sur le site et certifie l'ordre de commande StevenBmj.",
+          'This invoice mirrors the on-site invoice and certifies the StevenBmj order.'
+        ),
+        margin + 88,
+        y + 34,
+        210,
+        10
+      );
 
       const totalsX = pageWidth - margin;
+      const totalsLabelX = totalsX - 168;
+      let totalsY = y + 4;
       setText(muted, 8);
-      pdf.text('Sous-total', totalsX - 130, y + 4);
-      pdf.text(formatPrice(subtotal), totalsX, y + 4, { align: 'right' });
-      pdf.text('Livraison privee', totalsX - 130, y + 22);
+      pdf.text(pdfCopy('Sous-total', 'Subtotal'), totalsLabelX, totalsY);
+      pdf.text(formatPrice(subtotal), totalsX, totalsY, { align: 'right' });
+      totalsY += 18;
+      if (orderDiscountAmount > 0) {
+        setText([52, 211, 153], 8, 'bold');
+        pdf.text(`${pdfCopy('Réduction', 'Discount')} ${orderPromoCode ? `(${orderPromoCode})` : ''}`, totalsLabelX, totalsY);
+        pdf.text(`-${formatPrice(orderDiscountAmount)}`, totalsX, totalsY, { align: 'right' });
+        totalsY += 18;
+      }
+      setText(muted, 8);
+      pdf.text(pdfCopy('Expédition de valeur', 'Valued shipping'), totalsLabelX, totalsY);
       setText([52, 211, 153], 8, 'bold');
-      pdf.text('Offerte', totalsX, y + 22, { align: 'right' });
+      pdf.text(orderShippingCost === 0 ? pdfCopy('Offerte', 'Complimentary') : formatPrice(orderShippingCost), totalsX, totalsY, { align: 'right' });
+      totalsY += 26;
       setText(white, 9, 'bold');
-      pdf.text('TOTAL PAYE', totalsX - 130, y + 48);
-      setText(gold, 17, 'bold');
-      pdf.text(formatPrice(completedOrder.totalPrice), totalsX, y + 50, { align: 'right' });
+      pdf.text(pdfCopy('TOTAL PAYE', 'TOTAL PAID'), totalsLabelX, totalsY);
+      setText(gold, String(formatPrice(completedOrder.totalPrice)).length > 16 ? 13 : 17, 'bold');
+      pdf.text(formatPrice(completedOrder.totalPrice), totalsX, totalsY + 2, { align: 'right' });
       setText(muted, 6);
-      pdf.text('Maison StevenBmj - Cotonou, Benin - Facture generee automatiquement apres validation client.', pageWidth / 2, pageHeight - 24, { align: 'center' });
+      pdf.text(pdfCopy(
+        'Maison StevenBmj - Cotonou, Benin - Facture generee automatiquement apres validation client.',
+        'Maison StevenBmj - Cotonou, Benin - Invoice generated automatically after client validation.'
+      ), pageWidth / 2, pageHeight - 24, { align: 'center' });
 
       pdf.save(`facture-stevenbmj-${completedOrder.id}.pdf`);
       clearCart();
@@ -748,7 +801,7 @@ ${itemsText}
               {/* Total display */}
               <div className="space-y-2 text-xs pt-4 border-t border-white/5">
                 <div className="flex justify-between text-neutral-500">
-                  <span>Sous-total / Subtotal</span>
+                  <span>{language === 'FR' ? 'Sous-total' : 'Subtotal'}</span>
                   <span className="font-mono text-neutral-300">{formatPrice(subTotal)}</span>
                 </div>
                 {activeDiscount > 0 && (
@@ -909,9 +962,28 @@ ${itemsText}
                 </div>
 
                 <div className="text-right text-sm space-y-1.5 w-full md:min-w-[15rem] font-mono">
+                  {invoiceBreakdown && (
+                    <div className="flex justify-between text-neutral-500">
+                      <span>{language === 'FR' ? 'Sous-total :' : 'Subtotal :'}</span>
+                      <span className="text-white">{formatPrice(invoiceBreakdown.subtotal)}</span>
+                    </div>
+                  )}
+                  {invoiceBreakdown && invoiceBreakdown.discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>
+                        {language === 'FR' ? 'Réduction' : 'Discount'}
+                        {invoiceBreakdown.promoCode ? ` (${invoiceBreakdown.promoCode})` : ''}
+                      </span>
+                      <span>-{formatPrice(invoiceBreakdown.discountAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-neutral-500">
                     <span>{language === 'FR' ? 'Expédition de valeur :' : 'Valued shipping :'}</span>
-                    <span className="text-white">{language === 'FR' ? 'Gratuit' : 'Complimentary'}</span>
+                    <span className="text-white">
+                      {invoiceBreakdown && invoiceBreakdown.shippingCost > 0
+                        ? formatPrice(invoiceBreakdown.shippingCost)
+                        : (language === 'FR' ? 'Gratuit' : 'Complimentary')}
+                    </span>
                   </div>
                   <div className="flex justify-between text-yellow-500 text-lg font-bold border-t border-white/5 pt-2">
                     <span>{language === 'FR' ? 'TOTAL FACTURÉ :' : 'TOTAL INVOICED :'}</span>

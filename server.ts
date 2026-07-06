@@ -132,7 +132,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   footerTextEn: "StevenBmj is a registered trademark of the Sovereign Haute Couture House. Elegance is not an attitude, it is a complication.",
   footerCredits: "© 2026 StevenBmj. Conçu pour l'élite mondiale.",
   footerCreditsEn: "© 2026 StevenBmj. Curated for the global elite.",
-  
+  instagramUrl: "https://instagram.com",
+  facebookUrl: "https://www.facebook.com/share/1F3vVmSiGw/",
+  whatsappUrl: "https://wa.me/22955468138",
+
   // Custom Homepage Section 2 (Philosophie / Story)
   storyTitleFr: "L'Art de Vivre sans Compromis sur le Raffinement",
   storyTitleEn: "The Craft of Absolute and Timeless Masculine Silhouette",

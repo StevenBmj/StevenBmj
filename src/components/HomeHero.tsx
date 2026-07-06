@@ -234,8 +234,14 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             />
             <div className="absolute inset-0 bg-neutral-950/20" />
             <div className="absolute bottom-6 left-6 right-6 border border-amber-500/25 bg-black/90 p-5 rounded backdrop-blur-md">
-              <p className="font-mono text-[9px] text-amber-400 uppercase tracking-widest leading-none">Le Savoir-Faire Souverain</p>
-              <p className="text-xs text-neutral-300 mt-2 italic">"Chaque couture subit 37 points de contrôle minutieux avant d'atteindre votre vestiaire respectif."</p>
+              <p className="font-mono text-[9px] text-amber-400 uppercase tracking-widest leading-none">
+                {language === 'FR' ? 'Le Savoir-Faire Souverain' : 'Sovereign Craftsmanship'}
+              </p>
+              <p className="text-xs text-neutral-300 mt-2 italic">
+                {language === 'FR'
+                  ? "\"Chaque couture subit 37 points de contrôle minutieux avant d'atteindre votre vestiaire respectif.\""
+                  : "\"Every stitch passes 37 meticulous control points before reaching your private wardrobe.\""}
+              </p>
             </div>
           </motion.div>
 

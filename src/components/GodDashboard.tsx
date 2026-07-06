@@ -83,6 +83,8 @@ export default function GodDashboard() {
   const [selectedVipForMsg, setSelectedVipForMsg] = useState<any | null>(null);
   const [vipMsgBody, setVipMsgBody] = useState('');
   const [vipMsgSuccess, setVipMsgSuccess] = useState(false);
+  const [vipMsgError, setVipMsgError] = useState('');
+  const [vipMsgLoading, setVipMsgLoading] = useState(false);
 
   // Analytics filter state
   const [analyticsFilter, setAnalyticsFilter] = useState<'week' | 'month' | 'year'>('week');
@@ -176,6 +178,9 @@ export default function GodDashboard() {
           footerTextEn: "StevenBmj is a registered trademark of the Sovereign Haute Couture House. Elegance is not an attitude, it is a complication.",
           footerCredits: "© 2026 StevenBmj. Conçu pour l'élite mondiale.",
           footerCreditsEn: "© 2026 StevenBmj. Curated for the global elite.",
+          instagramUrl: "https://instagram.com",
+          facebookUrl: "https://www.facebook.com/share/1F3vVmSiGw/",
+          whatsappUrl: "https://wa.me/22955468138",
           storyTitleFr: "L'Art de Vivre sans Compromis sur le Raffinement",
           storyTitleEn: "The Craft of Absolute and Timeless Masculine Silhouette",
           storyDescFr: "Fondée sur l'excellence horlogère des plus hauts calibres, la Maison StevenBmj imagine un vestiaire d'exception où s'unissent des lignes géométriques avant-gardistes et une orfèvrerie étincelante. Nos diamants sont sertis main et nos mocassins crêpes taillés dans les plus hauts grades de suède d'Italie.",
@@ -431,13 +436,18 @@ export default function GodDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setShowProductForm(false);
         setEditingProduct(null);
         fetchAllGodData();
+        fetchProducts();
+      } else {
+        alert(data.error || data.message || "Impossible d'enregistrer le produit.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err?.message || "Impossible d'enregistrer le produit.");
     }
   };
 
@@ -446,11 +456,16 @@ export default function GodDashboard() {
     if (!window.confirm("Voulez-vous supprimer ce produit d'exception ?")) return;
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         fetchAllGodData();
+        fetchProducts();
+      } else {
+        alert(data.error || data.message || "Impossible de supprimer le produit.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err?.message || "Impossible de supprimer le produit.");
     }
   };
 
@@ -612,17 +627,40 @@ export default function GodDashboard() {
     });
   };
 
-  // handle dual channel instant simulation
-  const handleSendDualVipMessage = (vip: any) => {
+  // Send dual VIP message by email and open WhatsApp with prepared content
+  const handleSendDualVipMessage = async (vip: any) => {
     if (!vipMsgBody.trim()) return;
-    setSelectedVipForMsg(vip);
-    setVipMsgSuccess(true);
-    // Auto clear simulation banner after delay
-    setTimeout(() => {
-      setVipMsgSuccess(false);
-      setVipMsgBody('');
-      setSelectedVipForMsg(null);
-    }, 6000);
+    setVipMsgError('');
+    setVipMsgLoading(true);
+    try {
+      const res = await fetch('/api/vip-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: vip.customerName,
+          email: vip.email,
+          whatsapp: vip.whatsapp,
+          message: vipMsgBody,
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Transmission impossible.");
+      setSelectedVipForMsg(vip);
+      setVipMsgSuccess(true);
+      if (data.whatsappUrl) {
+        window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
+      }
+      fetchAllGodData();
+      setTimeout(() => {
+        setVipMsgSuccess(false);
+        setVipMsgBody('');
+        setSelectedVipForMsg(null);
+      }, 6000);
+    } catch (err: any) {
+      setVipMsgError(err.message || "Transmission impossible.");
+    } finally {
+      setVipMsgLoading(false);
+    }
   };
 
   // Announcements forms actions
@@ -688,12 +726,17 @@ export default function GodDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert("Paramètres mis à jour avec succès dans db_store.json");
+        alert("Parametres mis a jour avec succes.");
         fetchAllGodData();
+        fetchSettings();
+      } else {
+        alert(data.error || data.message || "Impossible de sauvegarder la configuration.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err?.message || "Impossible de sauvegarder la configuration.");
     }
   };
 
@@ -701,11 +744,15 @@ export default function GodDashboard() {
     if (!window.confirm("Voulez-vous purifier et vider intégralement l'historique des logs cyber-securité ?")) return;
     try {
       const res = await fetch('/api/security-logs', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         fetchAllGodData();
+      } else {
+        alert(data.error || data.message || "Impossible de vider les logs.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err?.message || "Impossible de vider les logs.");
     }
   };
 
@@ -720,15 +767,16 @@ export default function GodDashboard() {
     const graphHeight = svgHeight - padding * 2;
 
     const maxVal = Math.max(...analyticsData.map(d => Math.max(d.ventes, d.revenus, d.benefices)), 1000) * 1.1;
+    const pointX = (i: number) => padding + (analyticsData.length <= 1 ? graphWidth / 2 : (i / (analyticsData.length - 1)) * graphWidth);
 
     const pointsVentes = analyticsData.map((d, i) => {
-      const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+      const x = pointX(i);
       const y = svgHeight - padding - (d.ventes / maxVal) * graphHeight;
       return `${x},${y}`;
     }).join(' ');
 
     const pointsBenefices = analyticsData.map((d, i) => {
-      const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+      const x = pointX(i);
       const y = svgHeight - padding - (d.benefices / maxVal) * graphHeight;
       return `${x},${y}`;
     }).join(' ');
@@ -771,7 +819,7 @@ export default function GodDashboard() {
 
         {/* Data points pins glowing */}
         {analyticsData.map((d, i) => {
-          const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+          const x = pointX(i);
           const y = svgHeight - padding - (d.ventes / maxVal) * graphHeight;
           return (
             <g key={i} className="group cursor-help">
@@ -801,15 +849,16 @@ export default function GodDashboard() {
     const graphHeight = svgHeight - padding * 2;
 
     const maxVal = Math.max(...analyticsData.map(d => Math.max(d.visiteurs, d.clics)), 100) * 1.1;
+    const pointX = (i: number) => padding + (analyticsData.length <= 1 ? graphWidth / 2 : (i / (analyticsData.length - 1)) * graphWidth);
 
     const pointsVisiteurs = analyticsData.map((d, i) => {
-      const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+      const x = pointX(i);
       const y = svgHeight - padding - (d.visiteurs / maxVal) * graphHeight;
       return `${x},${y}`;
     }).join(' ');
 
     const pointsClics = analyticsData.map((d, i) => {
-      const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+      const x = pointX(i);
       const y = svgHeight - padding - (d.clics / maxVal) * graphHeight;
       return `${x},${y}`;
     }).join(' ');
@@ -849,7 +898,7 @@ export default function GodDashboard() {
 
         {/* Data points pins */}
         {analyticsData.map((d, i) => {
-          const x = padding + (i / (analyticsData.length - 1)) * graphWidth;
+          const x = pointX(i);
           const y = svgHeight - padding - (d.visiteurs / maxVal) * graphHeight;
           return (
             <g key={i} className="group cursor-help">
@@ -1446,7 +1495,7 @@ export default function GodDashboard() {
                     {editingProduct.name ? "MODIFICATION DE CRÉATION DE PRESTIGE" : "CONSIGNATION D'UNE CRÉATION LUXE"}
                   </h4>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-neutral-500 uppercase block">Nom Français *</label>
                       <input
@@ -1473,8 +1522,8 @@ export default function GodDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-1 col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1 sm:col-span-2">
                       <label className="text-[10px] font-mono text-neutral-500 uppercase block">Catégorie *</label>
                       <select
                         id="form-p-category"
@@ -1517,7 +1566,7 @@ export default function GodDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-neutral-500 uppercase block">Tarif Promo (€) (Optionnel)</label>
                       <input
@@ -2261,15 +2310,21 @@ StevenBmj - Conciergerie Royale`}
                           </div>
                         </div>
 
+                        {vipMsgError && (
+                          <p className="text-[10px] font-mono text-red-400 bg-red-950/20 border border-red-500/20 rounded px-3 py-2">
+                            {vipMsgError}
+                          </p>
+                        )}
+
                         <div className="flex justify-end pt-2">
                           <button
                             type="button"
                             onClick={() => handleSendDualVipMessage(selectedVipForMsg)}
-                            disabled={!vipMsgBody.trim()}
+                            disabled={!vipMsgBody.trim() || vipMsgLoading}
                             className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-600 text-black text-xs font-mono font-bold uppercase tracking-wider rounded-lg hover:brightness-110 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed duration-300 flex items-center space-x-2"
                           >
-                            <Send className="w-3.5 h-3.5" />
-                            <span>LANCER LA DOUBLE TRANSMISSION SÉCURISÉE</span>
+                            {vipMsgLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                            <span>{vipMsgLoading ? 'TRANSMISSION EN COURS...' : 'LANCER LA DOUBLE TRANSMISSION SÉCURISÉE'}</span>
                           </button>
                         </div>
                       </div>
@@ -2370,6 +2425,8 @@ StevenBmj - Conciergerie Royale`}
                               onClick={() => {
                                 setSelectedVipForMsg(vip);
                                 setVipMsgSuccess(false);
+                                setVipMsgError('');
+                                setVipMsgLoading(false);
                                 setVipMsgBody('');
                               }}
                               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded font-bold uppercase cursor-pointer flex items-center space-x-1 duration-250 shrink-0"
@@ -2761,7 +2818,7 @@ StevenBmj - Conciergerie Royale`}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-mono text-neutral-500 uppercase block">Annonce Défilante (Français) *</label>
                   <input
@@ -3665,6 +3722,42 @@ StevenBmj - Conciergerie Royale`}
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien Instagram Footer</label>
+                  <input
+                    id="sett-instagram-url"
+                    type="url"
+                    value={settings.instagramUrl || ''}
+                    onChange={(e) => setSettings({ ...settings, instagramUrl: e.target.value })}
+                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white font-mono"
+                    placeholder="https://instagram.com/..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien Facebook Footer</label>
+                  <input
+                    id="sett-facebook-url"
+                    type="url"
+                    value={settings.facebookUrl || ''}
+                    onChange={(e) => setSettings({ ...settings, facebookUrl: e.target.value })}
+                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white font-mono"
+                    placeholder="https://facebook.com/..."
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien WhatsApp Footer</label>
+                  <input
+                    id="sett-whatsapp-url"
+                    type="url"
+                    value={settings.whatsappUrl || ''}
+                    onChange={(e) => setSettings({ ...settings, whatsappUrl: e.target.value })}
+                    className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white font-mono"
+                    placeholder="https://wa.me/229..."
+                  />
+                </div>
+              </div>
+
               {/* SECTION: SECURITE SOUVERAINETÉ */}
               <div className="border-b border-white/5 pb-2 pt-4">
                 <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-red-500">
@@ -3771,10 +3864,13 @@ StevenBmj - Conciergerie Royale`}
                 <div className="bg-black/90 text-[10.5px] font-mono text-neutral-400 p-4 border border-white/10 rounded-lg max-h-64 overflow-y-auto space-y-1.5 font-sans leading-relaxed text-left">
                   {(() => {
                     const filteredLogs = logs.filter((log: any) => {
+                      const eventText = String(log.event || '');
+                      const statusText = String(log.status || '');
+                      const timestampText = String(log.timestamp || '');
                       const matchesText = logSearchQuery ? (
-                        log.event.toLowerCase().includes(logSearchQuery.toLowerCase()) || 
-                        log.status.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                        log.timestamp.toLowerCase().includes(logSearchQuery.toLowerCase())
+                        eventText.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+                        statusText.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+                        timestampText.toLowerCase().includes(logSearchQuery.toLowerCase())
                       ) : true;
                       
                       // Match date string like YYYY-MM-DD
@@ -3782,11 +3878,10 @@ StevenBmj - Conciergerie Royale`}
                       if (logSearchDate) {
                         // Date looks like YYYY-MM-DD, log timestamp looks like 24/05/2026 or ISO
                         // Let's check both format
-                        const formattedLogDate = log.timestamp.split(' '); // e.g., ["24/05/2026", "11:30:15"]
                         const [year, month, day] = logSearchDate.split('-'); // e.g., "2026-05-24" -> ["2026", "05", "24"]
                         const expectedFrenchDate = `${day}/${month}/${year}`; // "24/05/2026"
                         const expectedAltFrenchDate = `${day}-${month}-${year}`;
-                        matchesDate = log.timestamp.includes(expectedFrenchDate) || log.timestamp.includes(expectedAltFrenchDate) || log.timestamp.includes(logSearchDate);
+                        matchesDate = timestampText.includes(expectedFrenchDate) || timestampText.includes(expectedAltFrenchDate) || timestampText.includes(logSearchDate);
                       }
                       return matchesText && matchesDate;
                     });

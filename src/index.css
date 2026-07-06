@@ -39,6 +39,36 @@ textarea {
   }
 }
 
+@media (max-width: 420px) {
+  .header-brand-link {
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .header-brand-wordmark span:first-child {
+    font-size: 0.95rem;
+    letter-spacing: 0.14em;
+  }
+
+  .header-brand-wordmark span:last-child {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 0.2rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .header-brand-wordmark {
+    display: none;
+  }
+
+  .mobile-optional-icon {
+    display: none;
+  }
+}
+
 /* Custom fade element transitions */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(12px); }

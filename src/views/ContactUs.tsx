@@ -111,7 +111,7 @@ export default function ContactUs() {
               <div className="flex items-start space-x-3.5">
                 <Mail className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5 stroke-1" />
                 <div className="space-y-1">
-                  <p className="text-white font-medium">Secrétariat Général / Email</p>
+                  <p className="text-white font-medium">{language === 'FR' ? 'Secrétariat Général / Email' : 'General Secretariat / Email'}</p>
                   <p className="text-neutral-400 font-mono">stevenbmj202@gmail.com</p>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export default function ContactUs() {
           {submitted ? (
             <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded text-left space-y-2">
               <p className="text-sm font-semibold text-emerald-400 uppercase font-mono tracking-wider">
-                ✓ TRANSMISSION EFFECTUÉE AVEC NOTIFICATION CONCIERGE
+                {language === 'FR' ? '✓ TRANSMISSION EFFECTUÉE AVEC NOTIFICATION CONCIERGE' : '✓ TRANSMISSION SENT TO THE CONCIERGE DESK'}
               </p>
               <p className="text-xs text-neutral-400">
                 {language === 'FR'
@@ -180,7 +180,7 @@ export default function ContactUs() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Message d'élégance *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? "Message d'élégance *" : 'Prestige Message *'}</label>
                 <textarea
                   id="contact-form-msg"
                   required

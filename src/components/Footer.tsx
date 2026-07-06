@@ -19,6 +19,9 @@ export default function Footer({ setView }: FooterProps) {
   const [subscribeError, setSubscribeError] = useState('');
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [activePolicy, setActivePolicy] = useState<'cgv' | 'privacy' | 'legal' | null>(null);
+  const instagramUrl = settings?.instagramUrl || 'https://instagram.com';
+  const facebookUrl = settings?.facebookUrl || 'https://www.facebook.com/share/1F3vVmSiGw/';
+  const whatsappUrl = settings?.whatsappUrl || `https://wa.me/${String(settings?.whatsappContact || '22955468138').replace(/\D/g, '')}`;
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,15 +70,26 @@ export default function Footer({ setView }: FooterProps) {
           </p>
           <div className="flex space-x-4 pt-2">
             <a 
-              href="https://instagram.com" 
+              href={instagramUrl}
               target="_blank" 
               rel="noreferrer" 
               className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
+              title="Instagram"
             >
               <Instagram className="w-4 h-4" />
             </a>
+            <a
+              href={facebookUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
+              title="Facebook"
+              aria-label="Facebook StevenBmj"
+            >
+              <span className="block w-4 h-4 text-center font-sans font-black leading-4 text-[15px]">f</span>
+            </a>
             <a 
-              href="https://wa.me/2290155468138" 
+              href={whatsappUrl}
               target="_blank" 
               rel="noreferrer" 
               className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
@@ -244,7 +258,7 @@ export default function Footer({ setView }: FooterProps) {
             className="hover:text-amber-400 text-neutral-600 duration-300 decoration-none uppercase border-l border-white/10 pl-4"
             title="Prestataire de Discussion Privée"
           >
-            Réalisé par SHADOW007
+            {language === 'FR' ? 'Réalisé par SHADOW007' : 'Built by SHADOW007'}
           </a>
         </div>
       </div>
@@ -345,7 +359,8 @@ export default function Footer({ setView }: FooterProps) {
                     </p>
                     <p>
                       <strong>{language === 'FR' ? "Siège social :" : "Physical Showroom:"}</strong> Avenue du Prestige, Quartier Akpakpa, Cotonou, République du Bénin.<br />
-                      <strong>{language === 'FR' ? "Directeur de la Publication :" : "Director of Publication:"}</strong> Steven AMORIN.<br />
+                      <strong>{language === 'FR' ? "PDG de StevenBmj :" : "StevenBmj CEO:"}</strong> AMORIN Steven A . S<br />
+                      <strong>{language === 'FR' ? "Directeur de la Publication :" : "Director of Publication:"}</strong> AMORIN Steven A . S<br />
                       <strong>Contacts :</strong> +229 01 55 46 8138 / 01 44 15 80 44<br />
                       <strong>Email :</strong> <span className="text-amber-400 font-mono">stevenbmj202@gmail.com</span>
                     </p>

@@ -95,7 +95,9 @@ export default function CustomerCare() {
       
       {/* Introduction banner */}
       <div className="border-b border-white/5 pb-8 mb-12">
-        <span className="text-[10px] font-mono tracking-[0.3em] text-amber-500 uppercase block">DESK DE SOUVERAINETÉ CLIENT</span>
+        <span className="text-[10px] font-mono tracking-[0.3em] text-amber-500 uppercase block">
+          {language === 'FR' ? 'DESK DE SOUVERAINETÉ CLIENT' : 'CLIENT SOVEREIGNTY DESK'}
+        </span>
         <h1 className="text-3xl md:text-5xl font-light text-white tracking-widest uppercase mt-2 font-sans">
           {settings?.careTitle ? (
             language === 'FR' ? settings.careTitle : settings.careTitleEn
@@ -109,7 +111,7 @@ export default function CustomerCare() {
           ) : (
             language === 'FR'
               ? "Un conseiller d'artisanat à votre écoute pour orchestrer vos désirs horlogers, de broderie d'art et d'expédition diplomatique."
-              : "Un conseiller d'artisanat à votre écoute pour orchestrer vos désirs horlogers, de broderie d'art et d'expédition diplomatique."
+              : "A private craft adviser is here to coordinate watchmaking requests, couture details, and secure delivery matters."
           )}
         </p>
       </div>
@@ -120,7 +122,7 @@ export default function CustomerCare() {
         <div className="space-y-6">
           <h3 className="text-lg font-light tracking-[0.25em] text-white uppercase flex items-center gap-2">
             <HelpCircle className="w-5 h-5 text-amber-500 stroke-1" />
-            <span>Questions Fréquentes</span>
+            <span>{language === 'FR' ? 'Questions Fréquentes' : 'Frequently Asked Questions'}</span>
           </h3>
 
           <div className="space-y-3.5">
@@ -167,8 +169,8 @@ export default function CustomerCare() {
 
             <div className="bg-neutral-950 p-5 rounded border border-white/5 text-left">
               <Clock className="w-4.5 h-4.5 text-amber-500 mb-2 stroke-1" />
-              <p className="text-[10px] font-mono text-neutral-500 uppercase">Temps de Réponse</p>
-              <p className="text-xs text-white mt-1 font-bold">Moins de 15 minutes</p>
+              <p className="text-[10px] font-mono text-neutral-500 uppercase">{language === 'FR' ? 'Temps de Réponse' : 'Response Time'}</p>
+              <p className="text-xs text-white mt-1 font-bold">{language === 'FR' ? 'Moins de 15 minutes' : 'Under 15 minutes'}</p>
             </div>
           </div>
 
@@ -178,44 +180,46 @@ export default function CustomerCare() {
         <div className="bg-neutral-950/25 border border-white/5 rounded-lg p-6 md:p-8 space-y-6">
           <div className="text-left border-b border-white/5 pb-4">
             <h3 className="text-lg font-light tracking-[0.2em] text-white uppercase">
-              Rédiger un Ordre d'Information Privé
+              {language === 'FR' ? "Rédiger un Ordre d'Information Privé" : 'Write a Private Information Order'}
             </h3>
             <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-              Consignez vos questions d'atelier ou de mensurations spécifiques ci-dessous. Un compagnon tailleur traitera votre pli avec discrétion.
+              {language === 'FR'
+                ? "Consignez vos questions d'atelier ou de mensurations spécifiques ci-dessous. Un compagnon tailleur traitera votre pli avec discrétion."
+                : 'Share atelier questions or specific measurement requests below. A private tailor adviser will handle your note discreetly.'}
             </p>
           </div>
 
           {submitted ? (
             <div className="p-8 border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-center rounded space-y-3 font-mono text-xs uppercase">
-              <p className="text-base font-bold text-white">✓ Vœu Transmis avec Succès</p>
-              <p>Votre ordonnance a été consignée sous clé. Nous vous répondrons sous 15 minutes par mail de prestige.</p>
+              <p className="text-base font-bold text-white">{language === 'FR' ? '✓ Vœu Transmis avec Succès' : '✓ Request Sent Successfully'}</p>
+              <p>{language === 'FR' ? 'Votre ordonnance a été consignée sous clé. Nous vous répondrons sous 15 minutes par mail de prestige.' : 'Your request has been securely recorded. We will reply within 15 minutes by email.'}</p>
               <button
                 onClick={() => setSubmitted(false)}
                 className="text-amber-500 underline text-[10px] tracking-widest block mx-auto pt-4 font-bold cursor-pointer"
               >
-                Générer un nouvel ordre d'écriture
+                {language === 'FR' ? "Générer un nouvel ordre d'écriture" : 'Create a new request'}
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmitCare} className="space-y-4">
               
               <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Thématique d'Atelier *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? "Thématique d'Atelier *" : 'Atelier Topic *'}</label>
                 <select
                   id="care-topic-select"
                   value={careTopic}
                   onChange={(e) => setCareTopic(e.target.value)}
                   className="w-full bg-neutral-950 border border-white/10 text-xs px-3 h-11 text-neutral-300 select-all cursor-pointer"
                 >
-                  <option value="Mesure">Ajustements Mensurations / Haute Robe / Costumes</option>
-                  <option value="Joaillerie">Matrice d'Orfèvrerie Or 18K & Chaînes serties</option>
-                  <option value="Garantie">Garantie Mouvement Horlogerie Calibres</option>
-                  <option value="Livraison">Porteur Privé Diplomatique</option>
+                  <option value="Mesure">{language === 'FR' ? 'Ajustements Mensurations / Haute Robe / Costumes' : 'Measurements / Couture / Suits'}</option>
+                  <option value="Joaillerie">{language === 'FR' ? "Matrice d'Orfèvrerie Or 18K & Chaînes serties" : '18K Jewelry / Fine Chains'}</option>
+                  <option value="Garantie">{language === 'FR' ? 'Garantie Mouvement Horlogerie Calibres' : 'Watch Calibre Warranty'}</option>
+                  <option value="Livraison">{language === 'FR' ? 'Porteur Privé Diplomatique' : 'Private Secure Courier'}</option>
                 </select>
               </div>
 
               <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Votre Adresse Email Privée *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? 'Votre Adresse Email Privée *' : 'Your Private Email *'}</label>
                 <input
                   id="care-email-input"
                   type="email"
@@ -228,14 +232,14 @@ export default function CustomerCare() {
               </div>
 
               <div className="space-y-1.5 text-left">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Libellé du Message *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{language === 'FR' ? 'Libellé du Message *' : 'Message Details *'}</label>
                 <textarea
                   id="care-msg-textarea"
                   required
                   rows={4}
                   value={careMessage}
                   onChange={(e) => setCareMessage(e.target.value)}
-                  placeholder="Indiquez ici vos précisions d'ajustements..."
+                  placeholder={language === 'FR' ? "Indiquez ici vos précisions d'ajustements..." : 'Share your tailoring, jewelry, delivery, or warranty details...'}
                   className="w-full bg-neutral-950 border border-white/10 text-xs px-3.5 py-3.5 text-white focus:outline-none focus:border-amber-400 rounded"
                 />
               </div>
@@ -253,7 +257,7 @@ export default function CustomerCare() {
                 className="w-full h-11 bg-amber-400 text-black font-mono font-bold tracking-widest text-xs uppercase rounded duration-300 cursor-pointer flex items-center justify-center gap-2 shadow"
               >
                 <Send className="w-4 h-4" />
-                <span>{loading ? 'Transmission...' : 'Expédier mon Pli Concierge'}</span>
+                <span>{loading ? (language === 'FR' ? 'Transmission...' : 'Sending...') : (language === 'FR' ? 'Expédier mon Pli Concierge' : 'Send Concierge Request')}</span>
               </button>
 
             </form>

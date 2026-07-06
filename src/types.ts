@@ -159,6 +159,9 @@ export interface AppSettings {
   footerTextEn?: string;
   footerCredits?: string;
   footerCreditsEn?: string;
+  instagramUrl?: string;
+  facebookUrl?: string;
+  whatsappUrl?: string;
   faqsJson?: string;
   adminResetCode?: string;
 }

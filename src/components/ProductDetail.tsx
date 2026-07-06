@@ -50,6 +50,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
   }, [product.category]);
 
   const isFavorite = wishlist.includes(product.id);
+  const copy = (fr: string, en: string) => language === 'FR' ? fr : en;
 
   // Set default size on mount
   useEffect(() => {
@@ -235,7 +236,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
                   className="w-[min(340px,82vw)] h-[min(340px,82vw)]" 
                 />
                 <span className="absolute bottom-6 font-mono text-[9px] text-neutral-600 tracking-[0.2em] uppercase">
-                  PROJECTION HOLOGRAPHIQUE 3D DISCLOSÉ // CYBER MODEL
+                  {copy('PROJECTION HOLOGRAPHIQUE 3D // MODELE CYBER', '3D HOLOGRAPHIC PREVIEW // CYBER MODEL')}
                 </span>
               </div>
             ) : (
@@ -282,7 +283,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
                 }`}
               >
                 <RefreshCw className={`w-3 h-3 ${view3D ? 'animate-spin' : ''}`} />
-                <span>{view3D ? 'Vue HD' : 'VUE 3D'}</span>
+                <span>{view3D ? copy('Vue HD', 'HD View') : copy('VUE 3D', '3D VIEW')}</span>
               </button>
             </div>
           </div>
@@ -314,18 +315,18 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
           <div className="bg-neutral-950 border border-white/5 rounded-lg p-5 grid grid-cols-3 gap-4 text-center">
             <div className="space-y-1">
               <Shield className="w-5 h-5 text-amber-500 mx-auto stroke-1" />
-              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">Matières Nobles</p>
-              <p className="text-[9px] text-neutral-500">Sélection Or 18k & Cuir italien</p>
+              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">{copy('Matières Nobles', 'Noble Materials')}</p>
+              <p className="text-[9px] text-neutral-500">{copy('Sélection Or 18k & Cuir italien', '18k Gold & Italian Leather Selection')}</p>
             </div>
             <div className="space-y-1 border-x border-white/5">
               <Sparkles className="w-5 h-5 text-amber-500 mx-auto stroke-1 animate-pulse" />
-              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">Expédition Privée</p>
-              <p className="text-[9px] text-neutral-500">Par porteur de confiance</p>
+              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">{copy('Expédition Privée', 'Private Delivery')}</p>
+              <p className="text-[9px] text-neutral-500">{copy('Par porteur de confiance', 'Handled by trusted courier')}</p>
             </div>
             <div className="space-y-1">
               <RefreshCw className="w-5 h-5 text-amber-500 mx-auto stroke-1" />
-              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">Sur Mesure</p>
-              <p className="text-[9px] text-neutral-500">Ajustements ateliers offerts</p>
+              <p className="text-[10px] text-white font-semibold uppercase tracking-wider">{copy('Sur Mesure', 'Tailored Fit')}</p>
+              <p className="text-[9px] text-neutral-500">{copy('Ajustements ateliers offerts', 'Complimentary atelier adjustments')}</p>
             </div>
           </div>
 
@@ -349,14 +350,16 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
               </div>
               <span className="text-neutral-600">|</span>
               <span className="text-xs font-mono tracking-wider text-amber-500/80">
-                {product.stock > 0 ? `STOCK GARANTI: ${product.stock} UNITÉS DISPONIBLES` : 'SOUS COMMANDE ATELIER'}
+                {product.stock > 0
+                  ? copy(`STOCK GARANTI: ${product.stock} UNITÉS DISPONIBLES`, `GUARANTEED STOCK: ${product.stock} UNITS AVAILABLE`)
+                  : copy('SOUS COMMANDE ATELIER', 'ATELIER MADE TO ORDER')}
               </span>
             </div>
           </div>
 
           {/* Pricing area */}
           <div className="bg-neutral-900/40 border border-white/5 rounded-lg p-6 flex flex-col justify-center space-y-1">
-            <span className="text-[9px] font-mono text-neutral-500 uppercase">Tarif Souverain</span>
+            <span className="text-[9px] font-mono text-neutral-500 uppercase">{copy('Tarif Souverain', 'Sovereign Price')}</span>
             {product.promoPrice ? (
               <div className="flex items-baseline space-x-3">
                 <span className="text-sm text-neutral-500 line-through font-mono">
@@ -366,7 +369,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
                   {formatPrice(product.promoPrice)}
                 </span>
                 <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-mono px-2 py-0.5 rounded uppercase font-bold tracking-widest">
-                  OFFRE PRIVILÈGE
+                  {copy('OFFRE PRIVILÈGE', 'PRIVILEGE OFFER')}
                 </span>
               </div>
             ) : (
@@ -380,7 +383,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
           {sizes.length > 0 && (
             <div className="space-y-3">
               <div className="flex justify-between text-[10px] font-mono uppercase tracking-widest text-neutral-500">
-                <span>{product.category === 'suits' ? 'TAILLE COSTUME' : 'POINTURE SOULIER'}</span>
+                <span>{product.category === 'suits' ? copy('TAILLE COSTUME', 'SUIT SIZE') : copy('POINTURE SOULIER', 'SHOE SIZE')}</span>
                 <span className="text-white font-bold underline cursor-pointer">{language === 'FR' ? 'GUIDE DES TAILLES' : 'SIZE GUIDE'}</span>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -404,7 +407,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
 
           {/* Description details */}
           <div className="space-y-2">
-            <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">LA CRÉATION</span>
+            <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">{copy('LA CRÉATION', 'THE CREATION')}</span>
             <p className="text-xs text-neutral-400 leading-relaxed font-light">
               {language === 'FR' ? product.description : product.descriptionEn}
             </p>
@@ -413,7 +416,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
           {/* Technical specification table */}
           {product.specs.length > 0 && (
             <div className="space-y-3">
-              <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">FICHE TECHNIQUE</span>
+              <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block">{copy('FICHE TECHNIQUE', 'TECHNICAL DETAILS')}</span>
               <div className="border border-white/5 rounded-lg overflow-hidden bg-neutral-950 flex flex-col divide-y divide-white/5">
                 {product.specs.map((item, id) => (
                   <div key={id} className="flex justify-between items-center p-3 text-xs">
@@ -458,7 +461,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
               className="flex-1 h-12 bg-amber-400 text-black rounded text-xs tracking-widest font-mono uppercase font-black hover:bg-amber-300 transition-colors cursor-pointer flex items-center justify-center gap-2"
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>{product.stock === 0 ? 'RUPTURE STOCK' : 'PRENDRE LA CRÉATION'}</span>
+              <span>{product.stock === 0 ? copy('RUPTURE STOCK', 'OUT OF STOCK') : copy('PRENDRE LA CRÉATION', 'ADD THE CREATION')}</span>
             </button>
 
             {/* Direct wishlist toggle button */}
@@ -550,14 +553,14 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
                 ))}
               </div>
               <span className="text-[10px] font-mono tracking-wider text-amber-500/80 uppercase block mt-1">
-                Note de Prestige {reviewsList.length} avis
+                {copy(`Note de Prestige ${reviewsList.length} avis`, `Prestige Score ${reviewsList.length} reviews`)}
               </span>
             </div>
           </div>
           
           {/* Add Review form */}
           <form onSubmit={submitReview} className="space-y-3 bg-neutral-900/30 p-5 rounded-lg border border-white/5">
-            <h4 className="text-xs uppercase tracking-[0.2em] text-amber-400 font-bold">Rédiger un avis privé</h4>
+            <h4 className="text-xs uppercase tracking-[0.2em] text-amber-400 font-bold">{copy('Rédiger un avis privé', 'Write a private review')}</h4>
             
             <div className="flex items-center space-x-1 py-1">
               {[1, 2, 3, 4, 5].map((s) => (
@@ -598,7 +601,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
               type="submit"
               className="w-full bg-neutral-900 border border-white/10 text-[10px] uppercase font-mono tracking-widest text-amber-500 hover:bg-amber-400 hover:text-black py-2.5 duration-300 cursor-pointer rounded font-medium"
             >
-              Envoyer l'évaluation
+              {copy("Envoyer l'évaluation", 'Submit appraisal')}
             </button>
           </form>
         </div>
@@ -622,7 +625,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
               </p>
               {review.verified && (
                 <span className="text-[8px] font-mono text-amber-500/80 mt-2 block uppercase tracking-widest">
-                  ✓ CLIENT PRIVILÈGE SBMJ CERTIFIÉ
+                  {copy('✓ CLIENT PRIVILÈGE SBMJ CERTIFIÉ', '✓ CERTIFIED SBMJ PRIVILEGE CLIENT')}
                 </span>
               )}
             </div>

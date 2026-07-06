@@ -212,27 +212,27 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
         </nav>
 
         {/* Center: Brand Majestic Logo Identity */}
-        <div 
-          className="flex items-center justify-center space-x-3 cursor-pointer select-none" 
+        <div
+          className="header-brand-link flex min-w-0 items-center justify-center space-x-3 cursor-pointer select-none"
           onClick={() => setView('home')}
           title="StevenBmj Maison"
         >
           <Logo size={42} className="shrink-0" id="header-brand-logo" />
-          <div className="flex flex-col text-left">
+          <div className="header-brand-wordmark flex flex-col text-left min-w-0">
             <span className="text-xl font-light tracking-[0.25em] text-white uppercase font-sans">StevenBmj</span>
             <span className="text-[7px] font-mono tracking-[0.4em] text-amber-500 -mt-1 uppercase">Haute Joaillerie</span>
           </div>
         </div>
 
         {/* Right Corner: Quick Controls (Language, Currency, Shopping Bag, Wishlist) */}
-        <div className="flex items-center space-x-2 sm:space-x-4">
+        <div className="header-actions flex shrink-0 items-center space-x-1.5 sm:space-x-4">
           
           {/* Currency cycle button (Desktop only, now inside mobile menu for mobile compatibility) */}
           <button
             id="btn-currency"
             onClick={cycleCurrency}
             className="hidden md:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
-            title="Devise"
+            title={language === 'FR' ? 'Devise' : 'Currency'}
           >
             <Coins className="w-3.5 h-3.5 text-amber-500/85" />
             <span>{currency}</span>
@@ -243,7 +243,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             id="btn-lang"
             onClick={toggleLanguage}
             className="hidden md:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
-            title="Langue"
+            title={language === 'FR' ? 'Langue' : 'Language'}
           >
             <Languages className="w-3.5 h-3.5 text-amber-500/85" />
             <span>{language}</span>
@@ -350,8 +350,8 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           <button
             id="btn-wishlist"
             onClick={onOpenWishlist}
-            className="relative p-2 text-neutral-300 hover:text-red-400 duration-300 cursor-pointer"
-            title="Liste d'envies"
+            className="mobile-optional-icon relative p-2 text-neutral-300 hover:text-red-400 duration-300 cursor-pointer"
+            title={language === 'FR' ? "Liste d'envies" : 'Wishlist'}
           >
             <Heart className="w-4.5 h-4.5" />
             {wishlist.length > 0 && (
@@ -366,7 +366,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             id="btn-cart"
             onClick={() => setCartOpen(true)}
             className="relative p-2 text-neutral-300 hover:text-amber-400 duration-300 cursor-pointer"
-            title="Panier"
+            title={language === 'FR' ? 'Panier' : 'Cart'}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
             {totalCartCount > 0 && (
@@ -378,8 +378,11 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
           {/* Mobile menu toggle */}
           <button
+            id="btn-mobile-menu-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-neutral-300 hover:text-white md:hidden cursor-pointer"
+            className="shrink-0 p-2 text-neutral-300 hover:text-white md:hidden cursor-pointer"
+            aria-label={language === 'FR' ? 'Ouvrir le menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -389,7 +392,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
       {/* Mobile Menu Panel */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-white/5 bg-black/95 px-5 py-6 space-y-5 text-left divide-y divide-white/5 max-h-[calc(100vh-110px)] overflow-y-auto">
+        <div className="md:hidden border-t border-white/5 bg-black/95 px-4 sm:px-5 py-6 space-y-5 text-left divide-y divide-white/5 max-h-[calc(100vh-86px)] overflow-y-auto">
           <div className="flex flex-col space-y-1">
             {navLinks.map((link) => (
               <button
@@ -509,7 +512,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                 className="flex items-center justify-center space-x-2 p-2.5 w-full bg-neutral-900 border border-white/10 rounded cursor-pointer duration-300 text-neutral-300 text-xs font-mono"
               >
                 <Coins className="w-4 h-4 text-amber-500" />
-                <span>DEVISE: <strong className="text-white font-bold">{currency}</strong></span>
+                <span>{language === 'FR' ? 'DEVISE' : 'CURRENCY'}: <strong className="text-white font-bold">{currency}</strong></span>
               </button>
 
               <button
@@ -517,7 +520,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                 className="flex items-center justify-center space-x-2 p-2.5 w-full bg-neutral-900 border border-white/10 rounded cursor-pointer duration-300 text-neutral-300 text-xs font-mono"
               >
                 <Languages className="w-4 h-4 text-amber-500" />
-                <span>LANGUE: <strong className="text-white font-bold">{language}</strong></span>
+                <span>{language === 'FR' ? 'LANGUE' : 'LANGUAGE'}: <strong className="text-white font-bold">{language}</strong></span>
               </button>
             </div>
           </div>

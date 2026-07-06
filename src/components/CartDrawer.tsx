@@ -106,9 +106,9 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
 
   const shippingCost = useMemo(() => {
     if (subTotal === 0) return 0;
-    // Free above 3000 EUR
-    return subTotal >= 3000 ? 0 : 150;
-  }, [subTotal]);
+    const totalAfterDiscount = subTotal - discountAmount;
+    return totalAfterDiscount >= 3000 ? 0 : 150;
+  }, [discountAmount, subTotal]);
 
   const finalTotal = useMemo(() => {
     return subTotal - discountAmount + shippingCost;
@@ -255,7 +255,7 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
                   {promoError && <p className="text-[10px] text-red-400 font-mono mt-1 text-left">{promoError}</p>}
                   {appliedCode && (
                     <div className="flex justify-between items-center text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-left font-mono uppercase">
-                      <span>✓ PROMO APPLIQUÉE: {appliedCode} (-{discountPercent}%)</span>
+                      <span>✓ {language === 'FR' ? 'PROMO APPLIQUÉE' : 'PROMO APPLIED'}: {appliedCode} (-{discountPercent}%)</span>
                       <button 
                         onClick={() => {
                           setAppliedPromo(null);
@@ -270,19 +270,19 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
                   {/* Pricing Breakdown detailed */}
                   <div className="space-y-2 text-xs border-t border-white/5 pt-4">
                     <div className="flex justify-between text-neutral-400">
-                      <span>Sous-total / Subtotal</span>
+                      <span>{language === 'FR' ? 'Sous-total' : 'Subtotal'}</span>
                       <span className="font-mono text-white">{formatPrice(subTotal)}</span>
                     </div>
 
                     {discountPercent > 0 && (
                       <div className="flex justify-between text-emerald-400">
-                        <span>Réduction / Discount</span>
+                        <span>{language === 'FR' ? 'Réduction' : 'Discount'}</span>
                         <span className="font-mono">-{formatPrice(discountAmount)}</span>
                       </div>
                     )}
 
                     <div className="flex justify-between text-neutral-400">
-                      <span>Porteur Privé / Courier delivery</span>
+                      <span>{language === 'FR' ? 'Porteur Privé' : 'Courier delivery'}</span>
                       <span className="font-mono text-white">
                         {shippingCost === 0 
                           ? language === 'FR' ? 'OFFERT' : 'FREE' 

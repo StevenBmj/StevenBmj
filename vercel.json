@@ -30,6 +30,30 @@
   ],
   "rewrites": [
     {
+      "source": "/api/products/:id",
+      "destination": "/api/products?id=:id"
+    },
+    {
+      "source": "/api/analytics",
+      "destination": "/api/shop?resource=analytics"
+    },
+    {
+      "source": "/api/announcements/:id",
+      "destination": "/api/shop?resource=announcements&id=:id"
+    },
+    {
+      "source": "/api/announcements",
+      "destination": "/api/shop?resource=announcements"
+    },
+    {
+      "source": "/api/security-logs",
+      "destination": "/api/shop?resource=security-logs"
+    },
+    {
+      "source": "/api/vip-message",
+      "destination": "/api/shop?resource=vip-message"
+    },
+    {
       "source": "/api/promos/:code/toggle",
       "destination": "/api/shop?resource=promos&code=:code&action=toggle"
     },
