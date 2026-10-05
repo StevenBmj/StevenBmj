@@ -1,6 +1,8 @@
 {
   "name": "StevenBmj",
-  "description": "E-commerce haut de gamme et futuriste de montres, chaînes et vêtements homme premium.",
+  "description": "Marque béninoise de mode masculine, montres, chaussures et accessoires premium, en phase de structuration et d'expansion.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
