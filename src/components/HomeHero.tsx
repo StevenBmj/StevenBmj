@@ -159,7 +159,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
               {settings?.homepageHeroTitle ? (
                 language === 'FR' ? settings.homepageHeroTitle : settings.homepageHeroTitleEn
               ) : (
-                language === 'FR' ? "ATELIER HAUTE HORLOGERIE & COUTURE" : "PRESTIGE HOROLOGY & COUTURE"
+                language === 'FR' ? "MODE MASCULINE • MONTRES • ACCESSOIRES" : "MEN'S FASHION • WATCHES • ACCESSORIES"
               )}
             </span>
           </motion.div>
@@ -179,8 +179,8 @@ export default function HomeHero({ setView }: HomeHeroProps) {
               language === 'FR' ? settings.homepageHeroSubtitle : settings.homepageHeroSubtitleEn
             ) : (
               language === 'FR' 
-                ? "L'alliance absolue du perfectionnisme horloger suisse, de la joaillerie or 18k et du tailoring contemporain pour l'homme d'influence."
-                : "The absolute synergy of Swiss horological precision, 18-karat jewelry orfevrerie, and contemporary master tailoring."
+                ? "Une sélection de mode, montres, chaussures et accessoires premium pensée pour construire une allure masculine complète et cohérente."
+                : "A curated selection of fashion, watches, footwear and premium accessories designed to build a complete and consistent men's style."
             )}
           </motion.p>
 
@@ -195,7 +195,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
               onClick={() => setView('boutique')}
               className="w-full sm:w-auto px-6 sm:px-12 h-14 bg-amber-400 hover:bg-amber-300 text-black text-xs font-black font-mono tracking-widest uppercase duration-300 rounded flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_25px_rgba(217,119,6,0.3)] transition-transform hover:-translate-y-0.5"
             >
-              <span>{language === 'FR' ? "Explorer les Salons" : "Explore Exhibition halls"}</span>
+              <span>{language === 'FR' ? "Découvrir la Boutique" : "Explore the Shop"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
@@ -203,7 +203,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
               onClick={() => setView('about')}
               className="w-full sm:w-auto px-6 sm:px-12 h-14 border border-white/10 bg-neutral-900/60 text-neutral-300 hover:text-white hover:border-amber-400 rounded text-xs font-mono uppercase tracking-widest duration-300 cursor-pointer transition-transform hover:-translate-y-0.5"
             >
-              {language === 'FR' ? "L'Histoire de la Maison" : "Our Heritage Story"}
+              {language === 'FR' ? "Découvrir StevenBmj" : "Discover StevenBmj"}
             </button>
           </motion.div>
         </div>
@@ -235,12 +235,12 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <div className="absolute inset-0 bg-neutral-950/20" />
             <div className="absolute bottom-6 left-6 right-6 border border-amber-500/25 bg-black/90 p-5 rounded backdrop-blur-md">
               <p className="font-mono text-[9px] text-amber-400 uppercase tracking-widest leading-none">
-                {language === 'FR' ? 'Le Savoir-Faire Souverain' : 'Sovereign Craftsmanship'}
+                {language === 'FR' ? 'Une sélection pensée comme un vestiaire' : 'A curated complete wardrobe'}
               </p>
               <p className="text-xs text-neutral-300 mt-2 italic">
                 {language === 'FR'
-                  ? "\"Chaque couture subit 37 points de contrôle minutieux avant d'atteindre votre vestiaire respectif.\""
-                  : "\"Every stitch passes 37 meticulous control points before reaching your private wardrobe.\""}
+                  ? "\"Chaque détail compte : cohérence, présentation, service et confiance.\""
+                  : "\"Every detail matters: consistency, presentation, service and trust.\""}
               </p>
             </div>
           </motion.div>
@@ -256,23 +256,23 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block">NOTRE PHILOSOPHIE</span>
             <h2 className="text-3xl sm:text-4xl font-extralight text-white uppercase tracking-wider leading-snug">
               {language === 'FR' 
-                ? (settings?.storyTitleFr || "L'Art de Vivre sans Compromis sur le Raffinement") 
-                : (settings?.storyTitleEn || "The Craft of Absolute and Timeless Masculine Silhouette")}
+                ? (settings?.storyTitleFr || "L'élégance masculine, pensée comme une expérience complète") 
+                : (settings?.storyTitleEn || "Men's elegance designed as a complete experience")}
             </h2>
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-light">
               {language === 'FR'
-                ? (settings?.storyDescFr || "Fondée sur l'excellence horlogère des plus hauts calibres, la Maison StevenBmj imagine un vestiaire d'exception où s'unissent des lignes géométriques avant-gardistes et une orfèvrerie étincelante. Nos diamants sont sertis main et nos mocassins crêpes taillés dans les plus hauts grades de suède d'Italie.")
-                : (settings?.storyDescEn || "Formed upon the highest peaks of horological art, the Maison StevenBmj crafts an elite gentlemen vestiary merging sharp architectural lines with glittering hand-paved 18k diamonds and authentic Italian crepe loafers.")}
+                ? (settings?.storyDescFr || "StevenBmj développe un univers de style masculin réunissant montres, accessoires, vêtements et chaussures. Notre priorité est de construire une expérience de marque claire, cohérente et fiable, puis de structurer le modèle pour grandir au Bénin et en Afrique de l'Ouest.")
+                : (settings?.storyDescEn || "StevenBmj is developing a men's style universe bringing together watches, accessories, clothing and footwear. Our priority is to build a clear, consistent and reliable brand experience, then structure the model for growth in Benin and West Africa.")}
             </p>
 
             <div className="grid grid-cols-2 gap-8 pt-6 border-t border-white/5 font-mono">
               <div className="space-y-1">
-                <span className="text-sm font-bold text-white block">GENÈVE & PARIS</span>
-                <span className="text-[10px] text-neutral-500 uppercase">CALIBRES ET TAILORING</span>
+                <span className="text-sm font-bold text-white block">COTONOU • BÉNIN</span>
+                <span className="text-[10px] text-neutral-500 uppercase">ANCRAGE & DÉVELOPPEMENT</span>
               </div>
               <div className="space-y-1">
-                <span className="text-sm font-bold text-white block">COTONOU ELITE</span>
-                <span className="text-[10px] text-neutral-500 uppercase">ORFEVRERIE EXCLUSIVE</span>
+                <span className="text-sm font-bold text-white block">AFRIQUE DE L'OUEST</span>
+                <span className="text-[10px] text-neutral-500 uppercase">VISION D'EXPANSION</span>
               </div>
             </div>
           </motion.div>
