@@ -36,6 +36,7 @@ async function request(path: string, method = 'GET') {
 }
 const home = await request('/'); assert.equal(home.status, 200);
 assert.match(load(home.body)('title').text(), /StevenBmj/);
+assert.equal(load(home.body)('#boot-screen img').attr('src'), '/brand/logo-512.webp');
 const en = await request('/?lang=en'); assert.equal(load(en.body)('html').attr('lang'), 'en');
 const products = await request('/api/products'); assert.equal(products.status, 200);
 const catalogue = JSON.parse(products.body); assert.ok(Array.isArray(catalogue) && catalogue.length > 0);
@@ -58,6 +59,10 @@ for (const path of ['/.env.local', '/server.cjs', '/server.cjs.map', '/.server-b
   assert.ok(!/SUPABASE_SERVICE_ROLE_KEY|MAIL_APP_PASSWORD/.test(response.body));
 }
 for (const path of ['/sw.js', '/site.webmanifest', '/logo.png']) assert.equal((await request(path)).status, 200, path);
+for (const path of ['/brand/logo-512.webp', '/brand/logo-192.png', '/brand/logo-512.png']) {
+  const asset = await request(path); assert.equal(asset.status, 200, path);
+  assert.match(asset.headers.get('content-type') || '', /^image\//, path);
+}
 const receipt = { origin, checkedAt: new Date().toISOString(), records, result: 'passed' };
 writeFileSync(resolve('.codex-private', origin === 'https://stevenbmj.vercel.app' ? 'production-smoke.json' : 'preview-smoke.json'), JSON.stringify(receipt), { mode: 0o600 });
 console.log(JSON.stringify(receipt));

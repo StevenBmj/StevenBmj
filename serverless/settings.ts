@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { publicSettings, requireUser, readJson, reply, recordSecurityEvent } from '../src/server/security.js';
+import { invalidateSeoIndexingCache } from '../src/server/seo.js';
 
 const json = reply;
 
@@ -48,6 +49,7 @@ export default async function handler(req: any, res: any) {
       const merged = { ...publicSettings(current.data?.data), ...publicSettings(body) };
       const { error } = await supabase.from('app_settings').upsert({ id: 'default', data: merged }, { onConflict: 'id' });
       if (error) throw error;
+      invalidateSeoIndexingCache();
       await addSecurityLog(supabase, req, 'Configuration du site mise a jour', 'SECURED');
       return json(res, 200, { success: true, settings: merged });
     }

@@ -1,4 +1,3 @@
-import { dispatchApi } from '../src/server/apiRouter.js';
 import { reply } from '../src/server/security.js';
 import { servePage } from '../src/server/seo.js';
 
@@ -16,5 +15,6 @@ export default async function handler(req: any, res: any) {
     url.searchParams.delete('__path');
     req.originalUrl = `${url.pathname}${url.search}`;
   }
+  const { dispatchApi } = await import('../src/server/apiRouter.js');
   return dispatchApi(req, res);
 }

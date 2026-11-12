@@ -4,7 +4,7 @@ import { adminText } from './adminText';
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigation } from '../context/NavigationContext';
 import { useNotifications } from '../context/NotificationsContext';
@@ -14,6 +14,7 @@ import { Product, Order, PromoCode, AppSettings } from '../types';
 import Logo from './Logo';
 import InvoicePreview from './InvoicePreview';
 import AssistantSettings from './AssistantSettings';
+import AssistantPanel from './AssistantPanel';
 import SalesReports from './SalesReports';
 import OrderWorkspace from './OrderWorkspace';
 import DriverManagement from './DriverManagement';
@@ -23,7 +24,7 @@ import AdminMfa from './AdminMfa';
 import CustomerManagement from './CustomerManagement';
 import type { InvoiceFile } from '../lib/invoicePdf';
 import { 
-  BarChart, Sparkles, Plus, Edit2, Trash2, Tag, Percent, 
+  BarChart, Bot, Sparkles, Plus, Edit2, Trash2, Tag, Percent,
   Settings, Search, RefreshCw, Layers, ShieldAlert, Users, 
   HelpCircle, CheckCircle, Clock, Ban, Check, AlertOctagon, CheckSquare,
   Megaphone, Send, Mail, MessageSquare, PhoneCall, Star, LogOut, Eye, EyeOff
@@ -40,6 +41,13 @@ export default function GodDashboard() {
   
   // Security authentications
   const isAuthorized = user?.isAdmin === true && user?.mfaRequired !== true;
+  const workspace = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isAuthorized && activeTab === 'advisor') {
+      workspace.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+      workspace.current?.focus({ preventScroll: true });
+    }
+  }, [activeTab, isAuthorized]);
   const [loginLoading, setLoginLoading] = useState(false);
   
   const [adminUsername, setAdminUsername] = useState('');
@@ -702,13 +710,19 @@ export default function GodDashboard() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-3 min-w-0">
+          <button id="btn-admin-advisor-shortcut" type="button" onClick={() => navigate({ view: 'god', panel: null, adminSection: 'advisor' })}
+            className="min-h-11 inline-flex items-center justify-center gap-2 rounded border border-amber-300/40 bg-amber-300/10 px-4 text-sm font-medium text-amber-200">
+            <Bot className="h-5 w-5 shrink-0" />{language === 'FR' ? 'Agent IA' : 'AI agent'}
+          </button>
         {/* Admin profile logo */}
-        <div className="flex items-center space-x-3 bg-neutral-900/60 p-4 border border-white/5 rounded-lg shrink-0">
+        <div className="flex min-w-0 items-center space-x-3 bg-neutral-900/60 p-4 border border-white/5 rounded-lg">
           <Logo size={40} className="stroke-red-500" />
           <div className="text-left font-mono">
             <p className="text-xs text-white font-bold uppercase">{language === 'FR' ? 'Administrateur' : 'Administrator'}</p>
             <p className="text-[9px] text-neutral-500 break-all">{user.email}</p>
           </div>
+        </div>
         </div>
       </div>
 
@@ -719,6 +733,7 @@ export default function GodDashboard() {
         <div className="lg:col-span-1 space-y-2">
           {[
             { id: 'analytics', label: language === 'FR' ? 'RAPPORTS DE VENTES' : 'SALES REPORTS', icon: <BarChart className="w-4 h-4" /> },
+            { id: 'advisor', label: language === 'FR' ? 'AGENT IA' : 'AI AGENT', icon: <Bot className="w-4 h-4" /> },
             { id: 'products', label: language === 'FR' ? 'GESTION PRODUITS' : 'PRODUCTS', icon: <Layers className="w-4 h-4" /> },
             { id: 'orders', label: language === 'FR' ? 'COMMANDES ET LIVRAISONS' : 'ORDERS AND DELIVERIES', icon: <CheckSquare className="w-4 h-4" /> },
             { id: 'drivers', label: language === 'FR' ? 'LIVREURS' : 'DRIVERS', icon: <Users className="w-4 h-4" /> },
@@ -771,10 +786,20 @@ export default function GodDashboard() {
         </div>
 
         {/* Main tabs workspaces */}
-        <div className="lg:col-span-4 bg-neutral-950/40 border border-white/5 rounded-lg p-6 backdrop-blur-md">
+        <div ref={workspace} tabIndex={-1} className={`lg:col-span-4 min-w-0 scroll-mt-28 outline-none ${activeTab === 'advisor' ? '' : 'bg-neutral-950/40 border border-white/5 rounded-lg p-6 backdrop-blur-md'}`}>
           
           {/* TAB 1: ANALYTICS PREMIUM */}
           {activeTab === 'assistants' && <AssistantSettings />}
+          {activeTab === 'advisor' && <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-medium text-white">{language === 'FR' ? 'Agent IA' : 'AI agent'}</h2>
+              <button type="button" onClick={() => navigate({ view: 'god', panel: null, adminSection: 'assistants', assistantScope: 'admin' })}
+                className="min-h-11 inline-flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-sm text-neutral-300 hover:text-white">
+                <Settings className="h-4 w-4 shrink-0" />{language === 'FR' ? 'Configurer les clés de cet agent' : 'Configure this agent’s keys'}
+              </button>
+            </div>
+            <AssistantPanel scope="admin" />
+          </div>}
           {activeTab === 'analytics' && <SalesReports />}
           {activeTab === 'drivers' && <DriverManagement />}
           {activeTab === 'ledger' && <LedgerReports />}

@@ -22,6 +22,7 @@ import InvoiceVerification from './views/InvoiceVerification';
 import LuxuryChatbot from './components/LuxuryChatbot';
 import AuthModal from './components/AuthModal';
 import SeoMetadata from './components/SeoMetadata';
+import IntroScreen from './components/IntroScreen';
 import { Product } from './types';
 
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
@@ -30,7 +31,7 @@ const OrderWorkspace = lazy(() => import('./components/OrderWorkspace'));
 const DriverWorkspace = lazy(() => import('./views/DriverWorkspace'));
 
 function AppInner() {
-  const { language, triggerAuthRequired, products, productsLoading, user, authLoading } = useApp();
+  const { language, triggerAuthRequired, products, productsLoading, user, authLoading, hasIntroPlayed, setHasIntroPlayed } = useApp();
   const { route, navigate, setView, back, canGoBack, openPanel, closePanel } = useNavigation();
   const currentView = route.view;
   const activeProduct = products.find(product => product.id === route.productId);
@@ -54,6 +55,8 @@ function AppInner() {
   return (
     <div className="min-h-screen bg-black text-white relative flex flex-col justify-between selection:bg-amber-400 selection:text-black overflow-x-hidden w-full">
       <SeoMetadata />
+      {!hasIntroPlayed && !route.panel && !['god', 'account', 'driver', 'verification'].includes(currentView)
+        && <IntroScreen language={language} onComplete={() => setHasIntroPlayed(true)} />}
       
       {/* 2. Global Navbar Header */}
       <Header currentView={currentView} setView={setView} onOpenWishlist={() => setView('boutique')} />

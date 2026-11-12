@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Check, Eye, EyeOff, KeyRound, LoaderCircle, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
+import { Bot, Check, Eye, EyeOff, KeyRound, LoaderCircle, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
-import AssistantPanel from './AssistantPanel';
+import { useNavigation } from '../context/NavigationContext';
 
 type KeyInfo = { id: string; scope: 'client' | 'admin'; label: string; suffix: string; model: string;
   speechModel: string; speechVoice: string; enabled: boolean; lastUsedAt: string | null };
@@ -10,7 +10,8 @@ type KeyInfo = { id: string; scope: 'client' | 'admin'; label: string; suffix: s
 export default function AssistantSettings() {
   const { language } = useApp();
   const fr = language === 'FR';
-  const [scope, setScope] = useState<'client' | 'admin'>('client');
+  const { route, navigate } = useNavigation();
+  const scope = route.assistantScope || 'client';
   const [keys, setKeys] = useState<KeyInfo[]>([]);
   const [ready, setReady] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,11 +54,14 @@ export default function AssistantSettings() {
   return <section className="space-y-8 min-w-0">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5">
       <h2 className="text-xl text-white font-medium">{fr ? 'Assistants & clés API' : 'Assistants & API keys'}</h2>
-      <button type="button" onClick={load} title={fr ? 'Actualiser' : 'Refresh'} aria-label={fr ? 'Actualiser' : 'Refresh'} className="h-11 w-11 flex items-center justify-center rounded border border-white/15"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => navigate({ view: 'god', panel: null, adminSection: 'advisor' })} className="min-h-11 inline-flex items-center gap-2 rounded border border-amber-300/30 px-3 text-sm text-amber-200"><Bot className="h-4 w-4 shrink-0" />{fr ? 'Ouvrir l’agent IA' : 'Open AI agent'}</button>
+        <button type="button" onClick={load} title={fr ? 'Actualiser' : 'Refresh'} aria-label={fr ? 'Actualiser' : 'Refresh'} className="h-11 w-11 flex items-center justify-center rounded border border-white/15"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+      </div>
     </div>
     <div role="tablist" aria-label={fr ? 'Périmètre' : 'Scope'} className="flex border-b border-white/10">
       {(['client', 'admin'] as const).map(value => <button type="button" role="tab" aria-selected={scope === value} key={value}
-        onClick={() => { setScope(value); setForm(previous => ({ ...previous, apiKey: '' })); setError(''); }}
+        onClick={() => { navigate({ ...route, assistantScope: value }); setForm(previous => ({ ...previous, apiKey: '' })); setError(''); }}
         className={`min-h-11 px-4 border-b-2 text-sm ${scope === value ? 'border-amber-300 text-amber-300' : 'border-transparent text-neutral-400'}`}>
         {value === 'client' ? (fr ? 'Conseiller client' : 'Customer advisor') : (fr ? 'Assistant administrateur' : 'Administration assistant')}</button>)}
     </div>
@@ -86,6 +90,5 @@ export default function AssistantSettings() {
         <button type="button" disabled={!!busy} onClick={() => { if (window.confirm(fr ? 'Supprimer cette clé ?' : 'Delete this key?')) void mutate('DELETE', { id: key.id }, key.id); }} title={fr ? 'Supprimer la clé' : 'Delete key'} aria-label={fr ? 'Supprimer la clé' : 'Delete key'} className="h-11 w-11 flex items-center justify-center rounded text-red-300 hover:bg-white/10"><Trash2 className="w-4 h-4" /></button>
       </li>)}
     </ul>
-    {scope === 'admin' && <AssistantPanel scope="admin" />}
   </section>;
 }

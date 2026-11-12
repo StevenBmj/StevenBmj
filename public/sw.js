@@ -1,9 +1,15 @@
-const PUBLIC_CACHE = 'stevenbmj-public-v1';
+const PUBLIC_CACHE = 'stevenbmj-public-v2';
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(PUBLIC_CACHE).then(cache => cache.addAll(['/offline.html', '/logo.png'])));
+  event.waitUntil(caches.open(PUBLIC_CACHE).then(cache => cache.addAll(['/offline.html', '/brand/logo-192.png'])));
 });
-self.addEventListener('activate', event => { event.waitUntil(self.clients.claim()); });
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith('stevenbmj-public-') && key !== PUBLIC_CACHE).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
+});
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
@@ -41,7 +47,7 @@ self.addEventListener('push', event => {
     if (inbox.userId !== payload.userId || !Number.isSafeInteger(inbox.unreadCount) || inbox.unreadCount <= 0) return;
     await self.navigator.setAppBadge?.(inbox.unreadCount).catch(() => null);
     const path = ['/compte', '/god', '/livraisons'].includes(inbox.defaultPath) ? inbox.defaultPath : '/compte';
-    await self.registration.showNotification('StevenBmj', { body: payload.language === 'EN' ? 'A notification is waiting in your account.' : 'Une notification vous attend dans votre compte.', icon: '/logo.png', badge: '/logo.png', tag: payload.notificationId, data: { path } });
+    await self.registration.showNotification('StevenBmj', { body: payload.language === 'EN' ? 'A notification is waiting in your account.' : 'Une notification vous attend dans votre compte.', icon: '/brand/logo-192.png', badge: '/brand/logo-192.png', tag: payload.notificationId, data: { path } });
     for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage({ type: 'NOTIFICATIONS_CHANGED' });
   })().catch(() => null));
 });

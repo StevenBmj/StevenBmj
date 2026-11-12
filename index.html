@@ -4,10 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <link rel="canonical" href="https://stevenbmj.vercel.app/" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="shortcut icon" href="/logo.png" />
+    <link rel="icon" type="image/png" href="/brand/logo-192.png" />
+    <link rel="shortcut icon" href="/brand/logo-192.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="preload" href="/logo.png" as="image" type="image/png" fetchpriority="high" />
+    <link rel="preload" href="/brand/logo-512.webp" as="image" type="image/webp" fetchpriority="high" />
+    <style>
+      .brand-boot { position:fixed; inset:0; z-index:5000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; background:#080808; color:#f5d579; font-family:Arial,sans-serif; text-align:center; letter-spacing:0; opacity:1; transition:opacity 180ms ease; }
+      .brand-boot--leaving { opacity:0; }
+      .brand-boot__image { width:160px; height:160px; border-radius:50%; animation:brand-reveal 700ms ease-out both; }
+      .brand-boot__name { max-width:100%; font-size:32px; line-height:1.2; letter-spacing:0; }
+      .brand-boot__subtitle { font-size:13px; color:#a3a3a3; }
+      @keyframes brand-reveal { from { transform:scale(.88); } to { transform:scale(1); } }
+      @media (prefers-reduced-motion:reduce) { .brand-boot__image { animation:none; } .brand-boot { transition:none; } }
+    </style>
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,7 +47,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="StevenBmj" />
-    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/brand/logo-192.png" />
     
     <!-- JSON-LD Structured Schema Graph of StevenBmj for Instant Google Indexing as a Luxury Brand -->
     <script type="application/ld+json">
@@ -76,7 +85,7 @@
     </script>
   </head>
   <body class="bg-black text-white antialiased">
-    <div id="root"></div>
+    <div id="root"><div id="boot-screen" class="brand-boot" role="status"><img class="brand-boot__image" src="/brand/logo-512.webp" alt="StevenBmj" width="160" height="160" fetchpriority="high" /><span class="brand-boot__name">StevenBmj</span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

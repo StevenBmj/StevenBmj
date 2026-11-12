@@ -6,6 +6,32 @@ import { adminClient } from './security.js';
 import { pageMetadata, publicPages, SITE_ORIGIN, structuredMetadata } from '../lib/seo.js';
 
 let cached: { origin: string; at: number; products: any[] } | undefined;
+let indexingCache: { origin: string | undefined; expires: number; enabled: boolean } | undefined;
+let indexingRead: { origin: string | undefined; promise: Promise<boolean> } | undefined;
+let indexingVersion = 0;
+
+export function invalidateSeoIndexingCache() {
+  indexingVersion++;
+  indexingCache = undefined;
+  indexingRead = undefined;
+}
+
+async function indexingEnabled() {
+  const origin = process.env.SUPABASE_URL;
+  if (indexingCache && indexingCache.origin === origin && indexingCache.expires > Date.now()) return indexingCache.enabled;
+  if (indexingRead && indexingRead.origin === origin) return indexingRead.promise;
+  const version = indexingVersion;
+  const promise = (async () => {
+    const result = await adminClient().from('app_settings').select('data').eq('id', 'default').abortSignal(AbortSignal.timeout(1200)).maybeSingle();
+    if (result.error) throw new Error('Indexing configuration unavailable');
+    const enabled = result.data?.data?.seoIndexable !== false;
+    if (version === indexingVersion) indexingCache = { origin, expires: Date.now() + 30000, enabled };
+    return enabled;
+  })();
+  indexingRead = { origin, promise };
+  try { return await promise; }
+  finally { if (indexingRead?.promise === promise) indexingRead = undefined; }
+}
 async function products() {
   if (cached?.origin === process.env.SUPABASE_URL && Date.now() - cached.at < 60000) return cached.products;
   const response = await adminClient().from('products').select('id,name,name_en,description,description_en,price,promo_price,stock,images').limit(1000).abortSignal(AbortSignal.timeout(4000));
@@ -36,10 +62,11 @@ export async function servePage(req: any, res: any, page: string, template?: str
   }
   const meta = pageMetadata(path, language, product);
   // Metadata failure must not replace the usable storefront with an error page.
-  let config: any;
-  try { config = await adminClient().from('app_settings').select('data').eq('id', 'default').abortSignal(AbortSignal.timeout(4000)).maybeSingle(); }
-  catch { config = { error: true }; }
-  const indexingDisabled = !!config.error || catalogueUnavailable || config.data?.data?.seoIndexable === false || process.env.VERCEL_ENV === 'preview';
+  let indexingDisabled = catalogueUnavailable || process.env.VERCEL_ENV === 'preview';
+  if (meta.indexable && !indexingDisabled) {
+    try { indexingDisabled = !await indexingEnabled(); }
+    catch { indexingDisabled = true; }
+  }
   if (indexingDisabled || url.searchParams.has('panel')) meta.indexable = false;
   const privatePage = /^\/(god|compte|livraisons|verification)(\/|$)/.test(path);
   const status = catalogueUnavailable ? 503 : publicPages.includes(path) || !!product || privatePage ? 200 : 404;

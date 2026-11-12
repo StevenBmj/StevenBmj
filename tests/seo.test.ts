@@ -1,8 +1,13 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'cheerio';
 import entry from '../api/index';
 import { fakeSupabase } from './helpers/api';
+import { invoke, sessionHeaders, ADMIN_ID } from './helpers/api';
+import settings from '../serverless/settings';
+import { invalidateSeoIndexingCache } from '../src/server/seo';
+
+beforeEach(invalidateSeoIndexingCache);
 
 async function request(url: string) {
   let status = 200; let body = ''; const headers: Record<string, string> = {};
@@ -60,4 +65,23 @@ test('a public metadata outage still serves the application shell without indexi
     assert.equal($('#root').length, 1);
     assert.match($('meta[name=robots]').attr('content') || '', /noindex/);
   } finally { globalThis.fetch = previous; db.restore(); }
+});
+
+test('warm public pages share their indexing lookup instead of waiting for the database on every request', async () => {
+  const db = fakeSupabase();
+  try {
+    await request('/api?__page=contact');
+    const afterFirst = db.requests.filter(row => row.path === '/rest/v1/app_settings').length;
+    await request('/api?__page=aide');
+    assert.equal(db.requests.filter(row => row.path === '/rest/v1/app_settings').length, afterFirst);
+  } finally { db.restore(); }
+});
+
+test('saving the indexing setting invalidates the public metadata cache', async () => {
+  const db = fakeSupabase();
+  try {
+    assert.equal((await request('/api?__page=about')).headers['x-robots-tag'], 'index, follow');
+    assert.equal((await invoke(settings, { method: 'POST', headers: sessionHeaders(ADMIN_ID), body: { seoIndexable: false } })).status, 200);
+    assert.equal((await request('/api?__page=contact')).headers['x-robots-tag'], 'noindex, nofollow');
+  } finally { db.restore(); }
 });

@@ -13,7 +13,7 @@ interface LogoProps {
   id?: string;
 }
 
-const LOGO_SRC = '/logo.png';
+const LOGO_SRC = '/brand/logo-512.webp';
 
 function Logo({ className = '', size = 120, animated = false, id }: LogoProps) {
   const style = {

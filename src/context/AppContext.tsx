@@ -72,7 +72,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartOpen = route.panel === 'panier';
   const [chatOpen, setChatOpen] = useState(false);
   const [vipPoints, setVipPoints] = useState(0);
-  const [hasIntroPlayed, setHasIntroPlayed] = useState(() => sessionStorage.getItem('sbmj_intro_played') === 'true');
+  const [hasIntroPlayed, setHasIntroPlayed] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
@@ -347,7 +347,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSetIntroPlayed = (played: boolean) => {
     setHasIntroPlayed(played);
-    sessionStorage.setItem('sbmj_intro_played', String(played));
   };
 
   const setUser = (u: any | null) => {

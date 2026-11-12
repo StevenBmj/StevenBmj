@@ -23,6 +23,14 @@ test('FAQ deep links retain their anchor when seeding native history and changin
   assert.equal(routeHref(readRoute({ href: 'https://stevenbmj.vercel.app/contact#unexpected' })), '/contact');
 });
 
+test('administration restores the advisor and its own API configuration from deep links', () => {
+  for (const path of ['/god?section=advisor', '/god?lang=en&section=assistants&scope=admin']) {
+    assert.equal(routeHref(readRoute({ href: `https://stevenbmj.vercel.app${path}` })), path);
+  }
+  assert.equal(routeHref(readRoute({ href: 'https://stevenbmj.vercel.app/?scope=admin' })), '/');
+  assert.equal(routeHref(readRoute({ href: 'https://stevenbmj.vercel.app/god?section=assistants&scope=invalid' })), '/god?section=assistants');
+});
+
 test('malformed or unknown destinations do not restore arbitrary views', () => {
   for (const path of ['/missing', '/produit/%E0%A4%A', '/?panel=https://evil.invalid']) {
     assert.deepEqual(readRoute({ href: `https://stevenbmj.vercel.app${path}` }), { view: 'home', panel: null });

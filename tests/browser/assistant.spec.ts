@@ -65,3 +65,46 @@ test('admin key settings keep client and administrator credentials distinct', as
   await page.getByRole('button', { name: 'Tester la clé' }).click();
   await expect.poll(() => actions).toEqual([{ id: 'admin-key', action: 'test', scope: 'admin' }]);
 });
+
+test('the administrator opens the AI agent directly and keeps its own scope after reload', async ({ page }, testInfo) => {
+  const requests: any[] = [];
+  await page.route('**/api/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/assistant') {
+      requests.push(route.request().postDataJSON());
+      return route.fulfill({ json: { reply: 'Voici votre rapport de ventes.', recommendations: [] } });
+    }
+    return route.fulfill({ json: path === '/api/auth/session'
+      ? { user: { id: 'admin', name: 'Admin Essai', email: 'admin@example.test', isAdmin: true } }
+      : path === '/api/assistant/keys' ? { configured: true, keys: [] }
+      : path === '/api/settings' ? {} : [] });
+  });
+  await page.goto('/god');
+  await page.locator('#btn-admin-advisor-shortcut').click();
+  await expect(page).toHaveURL('/god?section=advisor');
+  const agent = page.getByRole('region', { name: 'Assistant de gestion', exact: true });
+  await expect(agent).toBeVisible();
+  await page.locator('#assistant-input-admin').fill('Montre le rapport de ventes');
+  await agent.locator('#btn-chatbot-send').click();
+  await expect(agent.getByText('Voici votre rapport de ventes.')).toBeVisible();
+  expect(requests).toHaveLength(1);
+  expect(requests[0].scope).toBe('admin');
+  const bounds = await agent.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: testInfo.outputPath('admin-agent.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Configurer les clés de cet agent' }).click();
+  await expect(page.getByRole('tab', { name: 'Assistant administrateur' })).toHaveAttribute('aria-selected', 'true');
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'Assistant administrateur' })).toHaveAttribute('aria-selected', 'true');
+  await page.locator('#btn-admin-tab-advisor').click();
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Assistant de gestion', exact: true })).toBeVisible();
+  if (testInfo.project.name === 'mobile') {
+    await page.locator('#btn-mobile-menu-toggle').click();
+    await page.getByRole('button', { name: /^LANGUE:\s*FR$/ }).click();
+    await page.locator('#btn-mobile-menu-toggle').click();
+  } else await page.locator('#btn-lang').click();
+  await expect(page.getByRole('region', { name: 'Management assistant', exact: true })).toBeVisible();
+  await expect(page.locator('#btn-admin-advisor-shortcut')).toHaveText('AI agent');
+});
