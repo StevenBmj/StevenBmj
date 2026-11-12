@@ -9,6 +9,15 @@ export function adminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+// Signing in changes a client's Authorization header, even without session persistence.
+// Keep user authentication separate from the server's private database client.
+export function userAuthClient() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('User authentication is not configured');
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } });
+}
+
 export function reply(res: any, status: number, body: any) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -163,7 +172,7 @@ export async function issueVerifiedSession(req: any, res: any, email: string, ex
   const client = adminClient();
   const link = await client.auth.admin.generateLink({ type: 'magiclink', email });
   if (link.error || !link.data.properties?.hashed_token) throw new Error('Unable to issue authentication session');
-  const auth = await client.auth.verifyOtp({ type: 'email', token_hash: link.data.properties.hashed_token });
+  const auth = await userAuthClient().auth.verifyOtp({ type: 'email', token_hash: link.data.properties.hashed_token });
   if (auth.error || !auth.data.session || auth.data.user?.id !== expectedUserId) throw new Error('Invalid authentication identity');
   await setSession(req, res, auth.data.session);
   return auth.data.session;

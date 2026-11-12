@@ -1,4 +1,4 @@
-import { activeSession, adminClient, assertSameOrigin, authRateLimit, clearSession, readCookies, readJson, reply, requireUser, userView, writeSessionCookies, sessionProfile } from '../../src/server/security.js';
+import { activeSession, adminClient, userAuthClient, assertSameOrigin, authRateLimit, clearSession, readCookies, readJson, reply, requireUser, userView, writeSessionCookies, sessionProfile } from '../../src/server/security.js';
 
 export default async function handler(req: any, res: any) {
   try {
@@ -18,7 +18,7 @@ export default async function handler(req: any, res: any) {
         let token = cookies.sbmj_access;
         let identity = token ? (await client.auth.getUser(token)).data.user : null;
         if (!identity && cookies.sbmj_refresh) {
-          const refreshed = await client.auth.refreshSession({ refresh_token: cookies.sbmj_refresh });
+          const refreshed = await userAuthClient().auth.refreshSession({ refresh_token: cookies.sbmj_refresh });
           identity = refreshed.data.user;
           token = refreshed.data.session?.access_token;
         }
@@ -40,7 +40,7 @@ export default async function handler(req: any, res: any) {
     if (!refreshToken) return reply(res, 401, { error: 'Connexion requise.' });
     if (!(await authRateLimit(req, res, 'session-refresh', 60, 300))) return;
     const client = adminClient();
-    const auth = await client.auth.refreshSession({ refresh_token: refreshToken });
+    const auth = await userAuthClient().auth.refreshSession({ refresh_token: refreshToken });
     if (auth.error || !auth.data.session || !auth.data.user || !(await activeSession(client, auth.data.session.access_token, auth.data.user.id))) {
       clearSession(req, res);
       return reply(res, 401, { error: 'Session expiree.' });

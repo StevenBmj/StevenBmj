@@ -1,4 +1,4 @@
-import { adminClient, authRateLimit, readJson, reply, setSession, userView, sessionProfile } from '../../src/server/security.js';
+import { adminClient, userAuthClient, authRateLimit, readJson, reply, setSession, userView, sessionProfile } from '../../src/server/security.js';
 
 export default async function handler(req: any, res: any) {
   try {
@@ -9,7 +9,7 @@ export default async function handler(req: any, res: any) {
     const password = String(body.password || '');
     if (!email || !password || password.length > 1024) return reply(res, 400, { error: 'Email et mot de passe requis.' });
     const client = adminClient();
-    const auth = await client.auth.signInWithPassword({ email, password });
+    const auth = await userAuthClient().auth.signInWithPassword({ email, password });
     if (auth.error || !auth.data.session || !auth.data.user) return reply(res, 401, { error: 'Identifiants incorrects.' });
     const profile = await client.from('profiles').select('*').eq('id', auth.data.user.id).maybeSingle();
     if (profile.error) throw new Error('Unable to read profile');

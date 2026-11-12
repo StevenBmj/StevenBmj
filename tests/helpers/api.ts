@@ -33,7 +33,7 @@ export function sessionHeaders(id: string) {
 }
 
 // Only the external Supabase HTTP boundary is simulated; the real handlers run.
-export function fakeSupabase() {
+export function fakeSupabase(options: { enforceServiceRole?: boolean } = {}) {
   const originalFetch = globalThis.fetch;
   process.env.SUPABASE_URL = 'https://security-tests.invalid';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-only';
@@ -67,6 +67,9 @@ export function fakeSupabase() {
     const body = init.body ? JSON.parse(String(init.body)) : undefined;
     requests.push({ method, path: url.pathname, body });
     const json = (value: any, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
+    if (options.enforceServiceRole !== false && url.pathname.startsWith('/rest/v1/') && headers.get('authorization') !== 'Bearer test-service-only') {
+      return json({ code: '42501', message: 'permission denied for private database resource' }, 403);
+    }
     if (url.pathname === '/auth/v1/user') {
       const profile = profiles.find(p => headers.get('authorization') === `Bearer ${tokenFor(p.id)}`);
       return profile ? json({ ...profile, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {} }) : json({ msg: 'Invalid JWT', code: 'bad_jwt' }, 401);

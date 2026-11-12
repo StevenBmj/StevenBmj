@@ -96,6 +96,29 @@ test('password login issues HttpOnly cookies and never returns tokens in JSON', 
   } finally { db.restore(); }
 });
 
+test('administrator login keeps database privileges separate from the authenticated user session', async () => {
+  const db = fakeSupabase({ enforceServiceRole: true });
+  try {
+    const result = await invoke(login, { method: 'POST', body: { email: 'admin@example.com', password: 'ValidPassword123!' } });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.user.isAdmin, true);
+    assert.ok(result.headers['set-cookie']);
+  } finally { db.restore(); }
+});
+
+test('refresh and expired-access logout retain server privileges after the Auth token changes', async () => {
+  const db = fakeSupabase({ enforceServiceRole: true });
+  try {
+    const headers = { host: 'localhost:3000', cookie: `sbmj_refresh=refresh-${ADMIN_ID}` };
+    const refreshed = await invoke(session, { method: 'POST', headers, body: { action: 'refresh' } });
+    assert.equal(refreshed.status, 200);
+    assert.equal(refreshed.body.user.isAdmin, true);
+    const loggedOut = await invoke(session, { method: 'POST', headers, body: { action: 'logout' } });
+    assert.equal(loggedOut.status, 200);
+    assert.equal(db.tables.web_sessions.some(row => row.user_id === ADMIN_ID), false);
+  } finally { db.restore(); }
+});
+
 test('database-backed throttling blocks login before checking the password', async () => {
   const db = fakeSupabase();
   try {
