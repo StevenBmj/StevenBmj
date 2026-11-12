@@ -35,15 +35,16 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setIndex(steps.length - 1);
       historyCursor.current = steps.length - 1;
     }
-    const restore = () => {
+    const restore = (event: Event) => {
       const nextIndex = historyIndex();
       const nextRoute = readRoute(window.location);
       const overlay = window.history.state?.[historyOverlayKey];
-      if (overlay && !activeHistoryOverlays.has(overlay)) {
+      if (event.type === 'popstate' && overlay && !activeHistoryOverlays.has(overlay)) {
         window.history.go(nextIndex < historyCursor.current ? -1 : 1);
         return;
       }
-      if (!activeHistoryOverlays.size && nextIndex > 1 && nextIndex === historyCursor.current
+      // Fragment traversal emits both events; only popstate may skip a retired entry.
+      if (event.type === 'popstate' && !activeHistoryOverlays.size && nextIndex > 1 && nextIndex === historyCursor.current
         && routeHref(nextRoute) === routeHref(routeCursor.current)) {
         window.history.back();
         return;

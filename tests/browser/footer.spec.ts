@@ -39,6 +39,15 @@ test('footer opens the requested account form, including repeated registration',
   await expect(page.locator('#auth-input-fullname')).toBeVisible();
 });
 
+test('native back from the FAQ anchor returns to the help page without skipping it', async ({ page }) => {
+  await page.goto('/aide');
+  await page.getByRole('contentinfo').getByRole('link', { name: 'FAQ', exact: true }).click();
+  await expect(page).toHaveURL('/aide#faq');
+  await page.goBack();
+  await expect(page).toHaveURL('/aide');
+  await expect(page.locator('#faq')).toBeAttached();
+});
+
 test('signed-in clients get their cart and support rather than registration', async ({ page }) => {
   await page.route('**/api/auth/session', route => route.fulfill({ json: { user: { id: 'footer-client', name: 'Client Footer', email: 'client@example.test' } } }));
   await page.goto('/');

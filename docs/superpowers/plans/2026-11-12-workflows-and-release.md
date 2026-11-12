@@ -32,6 +32,7 @@ Write failing handler/transaction tests first. Cover role/ownership, malformed p
 - [x] Owner confirmed receiving both authorized email checks, including the real outreach-handler test. No fictitious mailbox or campaign was used.
 - [x] Merged the incoming owner changes; verified encrypted public-table restoration and applied the five release migrations. Catalogue media reference changed only after original-byte verification.
 - [x] Reproduced direct-entry native back leaving the app; implemented finite predecessor history and history-aware transient windows. Full desktop/mobile browser suite passed all 54 tests, including PDF equality, account retention and footer navigation.
-- [ ] Complete final browser/PDF and preview smoke checks, correct-repository push, production verification, credential retirement and the release evidence close-out.
+- [x] Completed full browser/PDF tests, protected-preview probes, correct-repository push and automatic production publication. Repeated all 23 production probes after retiring the exposed legacy Supabase keys and replacing the database password.
+- [x] Added the FAQ fragment/native-back regression and retired both unsafe legacy maintenance commands. Final checks passed: 86 unit tests and 32 focused navigation/footer tests, in addition to the earlier full 54-test browser run.
 
 See `docs/operations/2026-11-12-release-progress.md` for actual evidence and remaining external setup. The unchecked work-package items above intentionally remain open until their acceptance/release requirements are satisfied.

@@ -51,14 +51,30 @@ No real OpenRouter provider key has been supplied for end-to-end text/voice acce
 
 ## Verification And Publication Status
 
-- Latest completed full unit run, including the final invoice optimization, FAQ-history regression and retired-seed guard: 85 passed.
+- Full expanded unit suite: 86 passed, including the legacy-schema refusal test.
 - TypeScript and production builds passed; production dependency audit reported zero known vulnerabilities.
 - Full desktop/mobile browser verification passed: 54 tests, including exact PDF equality, native history, account retention, narrow navigation, legal documents and driver/customer receipt workflows. Metadata outage handling, oversized registration-dialog scrolling, invoice image preparation and FAQ anchor preservation were corrected after reproducing their failures.
 - The latest protected preview passed all 23 public/private routing and deployment probes. The final FAQ anchor change is included in the local build being tested before publication.
 - Preview routing was corrected to process the home page before static-file resolution. Explicit Node ESM imports fixed the preview API startup error.
 - Modern Supabase keys, the stable vault key, independent code secret, Google client IDs and push keys were synchronized only to `stevenbmj` production/preview environments.
-- Final production publication, legacy API/signing-key retirement, database-password replacement and post-release probes must be recorded below after they actually succeed. These are not implied by a successful preview build.
-- The old plaintext seed command is disabled rather than allowed to restore shared passwords or overwrite a protected live database. A regression test verifies that it exits without changing data. A scan of staged files and public build assets found none of the nine actual private environment values checked.
+- The old plaintext seed and original-schema commands are disabled rather than allowed to restore shared passwords, recreate public policies or overwrite a protected live database. Regression tests verify their refusal. A scan of staged files and public build assets found none of the nine actual private environment values checked.
+
+## Production Release
+
+- `ee26b945b51634cef5da07b213a1e568cf822974` was pushed, without force, to `StevenBmj/StevenBmj:main` after the owner commit was merged.
+- The connected Git integration automatically created the READY production deployment `stevenbmj-dc43cuao6-stevenamorin202-8617s-projects.vercel.app`, with the exact same commit. No manual production deploy was needed.
+- `https://stevenbmj.vercel.app` passed all 23 release probes before and after credential retirement.
+- The legacy API keys were disabled and their former HS256 signing key revoked while the existing active ES256 signer was retained. The old service JWT was probed and rejected. The modern replacement keys remain server-side.
+- The exposed database password was replaced and its restricted local connection configuration updated. No administrator password was changed.
+- Unused Gemini key/model variables were removed from the `stevenbmj` Vercel project. Removal is not revocation at the Gemini provider.
+- Post-change counts remain 13 profiles, 6 orders, 21 products and five registered migrations. The complete migration registry/permission check passed again in a rolled-back transaction. The security advisor reports no ERROR and retains the compromised-password protection WARN described above.
+- The final follow-up corrects a reproduced double `popstate`/`hashchange` event when returning from the FAQ anchor. All 32 targeted desktop/mobile navigation and footer tests passed after that correction; TypeScript and the production build also passed. The additional maintenance refusal is covered by the 86-test unit suite.
+
+## Demonstration Video
+
+`node scripts/record-client-demo.mjs` records the public storefront with its real catalogue photos. Its account, code-validation and order responses are confined to the recording browser and prominently labelled as a demonstration. It downloads a real PDF from the application and verifies preparation of a manual WhatsApp handoff; it does not send WhatsApp messages, create a production account, perform a payment or substitute a simulated registration for live-email acceptance.
+
+The generated portrait MP4 and demonstration PDF are restricted local artifacts in `.codex-private/media/client-demo/`, not Git uploads or public customer records. Production write requests outside the isolated responses are refused by the recorder. The video is an annotated walkthrough, not evidence of an actual paid order or a finished advertising campaign.
 
 ## Owner Actions And External Acceptance
 
