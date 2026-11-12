@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
-import { authRateLimit, issueVerifiedSession, readJson, reply } from '../../src/server/security';
+import { authRateLimit, issueVerifiedSession, readJson, reply, userView, sessionProfile } from '../../src/server/security.js';
 
 
 const json = reply;
@@ -110,8 +110,8 @@ export default async function handler(req: any, res: any) {
       profile = updated.data;
     }
 
-    await issueVerifiedSession(req, res, email, profile.id);
-    return json(res, 200, { success: true, user: publicUser(profile) });
+    const session = await issueVerifiedSession(req, res, email, profile.id);
+    return json(res, 200, { success: true, user: userView(sessionProfile(profile, session.user, session.access_token)) });
   } catch (error: any) {
     return json(res, 400, { error: 'Authentification Google impossible. Verifiez la configuration puis reessayez.' });
   }

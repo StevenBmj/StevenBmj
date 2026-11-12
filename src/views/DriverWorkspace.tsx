@@ -3,11 +3,12 @@ import { useApp } from '../context/AppContext';
 import { apiFetch } from '../lib/api';
 import { deliveryLabel } from '../lib/delivery';
 import OrderWorkspace from '../components/OrderWorkspace';
+import CountryPhoneField from '../components/CountryPhoneField';
 
 export default function DriverWorkspace() {
   const { user, language, authLoading, openAuth } = useApp();
   const [profile, setProfile] = useState<any>(undefined);
-  const [phone, setPhone] = useState('+229');
+  const [phone, setPhone] = useState(user?.whatsapp || '');
   const [zone, setZone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +44,7 @@ export default function DriverWorkspace() {
     {user && profile === null && <form className="max-w-xl space-y-5" onSubmit={event => { event.preventDefault(); void save({ phone, zone }, 'POST'); }}>
       <h2 className="text-xl">{fr ? 'Candidature livreur' : 'Driver application'}</h2>
       <p className="text-sm leading-6 text-neutral-400">{fr ? 'L’équipe doit approuver votre candidature avant toute affectation.' : 'The team must approve your application before any assignment.'}</p>
-      <label className="block text-sm">{fr ? 'WhatsApp au format international' : 'International WhatsApp number'}<input required type="tel" autoComplete="tel" pattern="\+[0-9]{8,15}" value={phone} onChange={event => setPhone(`+${event.target.value.replace(/\D/g, '').slice(0, 15)}`)} className="mt-2 min-h-11 w-full rounded border border-white/20 bg-black px-3 text-base" /></label>
+      <CountryPhoneField id="driver-phone" value={phone} onChange={setPhone} language={language} />
       <label className="block text-sm">{fr ? 'Zone de livraison' : 'Delivery area'}<input required minLength={2} maxLength={160} value={zone} onChange={event => setZone(event.target.value)} className="mt-2 min-h-11 w-full rounded border border-white/20 bg-black px-3 text-base" /></label>
       <button disabled={busy} className="min-h-11 rounded bg-amber-400 px-4 text-sm font-semibold text-black disabled:opacity-50">{fr ? 'Envoyer ma candidature' : 'Submit application'}</button>
     </form>}

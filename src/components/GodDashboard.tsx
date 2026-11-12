@@ -1,3 +1,4 @@
+import { adminText } from './adminText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -18,7 +19,8 @@ import OrderWorkspace from './OrderWorkspace';
 import DriverManagement from './DriverManagement';
 import LedgerReports from './LedgerReports';
 import SecurityConsole from './SecurityConsole';
-import VipMessageComposer from './VipMessageComposer';
+import AdminMfa from './AdminMfa';
+import CustomerManagement from './CustomerManagement';
 import type { InvoiceFile } from '../lib/invoicePdf';
 import { 
   BarChart, Sparkles, Plus, Edit2, Trash2, Tag, Percent, 
@@ -37,7 +39,7 @@ export default function GodDashboard() {
   useEffect(() => { setActiveTab(route.adminSection || (route.orderId ? 'orders' : 'analytics')); }, [route.adminSection, route.orderId]);
   
   // Security authentications
-  const isAuthorized = user?.isAdmin === true;
+  const isAuthorized = user?.isAdmin === true && user?.mfaRequired !== true;
   const [loginLoading, setLoginLoading] = useState(false);
   
   const [adminUsername, setAdminUsername] = useState('');
@@ -59,26 +61,11 @@ export default function GodDashboard() {
   const [showAnnForm, setShowAnnForm] = useState(false);
   const [newAnn, setNewAnn] = useState({ text: '', textEn: '', durationMinutes: 1440 });
 
-  // VIP Clientèle Search & Editing Form
-  const [vipSearchQuery, setVipSearchQuery] = useState('');
-  const [editingVip, setEditingVip] = useState<{ id?: string; customerName: string; whatsapp: string; email: string; orderCount?: number } | null>(null);
-  const [showVipForm, setShowVipForm] = useState(false);
-  const [manualVips, setManualVips] = useState<{ id: string; customerName: string; whatsapp: string; email: string; orderCount: number }[]>(() => {
-    const saved = localStorage.getItem('sbmj_manual_vips');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Dual messaging states from StevenBmj
-  const [selectedVipForMsg, setSelectedVipForMsg] = useState<any | null>(null);
-  const [vipMsgBody, setVipMsgBody] = useState('');
-  const [vipMsgSuccess, setVipMsgSuccess] = useState(false);
-  const [vipMsgError, setVipMsgError] = useState('');
-  const [vipMsgLoading, setVipMsgLoading] = useState(false);
-
-
   // Form states for Product management
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [productSaving, setProductSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
 
   // Form states for Promos
   const [showPromoForm, setShowPromoForm] = useState(false);
@@ -93,13 +80,6 @@ export default function GodDashboard() {
   // Security LOG Search States
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [logSearchDate, setLogSearchDate] = useState('');
-
-  // Real Registered Client Accounts from server database
-  const [backendUsers, setBackendUsers] = useState<any[]>([]);
-  const [showCreateUserForm, setShowCreateUserForm] = useState(false);
-  const [newUserData, setNewUserData] = useState({ name: '', email: '', password: '' });
-  const [createUserError, setCreateUserError] = useState('');
-  const [createUserSuccess, setCreateUserSuccess] = useState('');
 
   // Password recovery state for admin login screen
   const [isAdminRecoverMode, setIsAdminRecoverMode] = useState(false);
@@ -135,77 +115,28 @@ export default function GodDashboard() {
         
         // Merge with defaults if fields are empty
         const defaultValues = {
-          announcementText: "✨ EXPÉDITION PRIVÉE OFFERTE DANS TOUT LE GOLFE DE GUINÉE & À L'INTERNATIONAL SUR TOUTES NOS COLLECTIONS D'EXCEPTION ✨",
-          announcementTextEn: "✨ FREE PRIVATE COURIER DELIVERY IN WEST AFRICA & WORLDWIDE ACROSS ALL EXQUISITE COLLECTIONS ✨",
-          homepageHeroTitle: "L'ÉLÉGANCE À L'ÉTAT BRUT",
-          homepageHeroTitleEn: "RAW AND PURE ELEGANCE",
-          homepageHeroSubtitle: "Découvrez notre collection exclusive de montres de prestige, costumes de créateurs et joallerie de haute facture pour l'homme d'action moderne.",
-          homepageHeroSubtitleEn: "Explore our exclusive collection of prestige watches, bespoke tailoring, and majestic fine jewelry curated for the modern master of action.",
-          homepageHeroImage1: "https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=1600&auto=format&fit=crop",
-          homepageHeroImage2: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=1600&auto=format&fit=crop",
-          homepageHeroImage3: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?q=80&w=1600&auto=format&fit=crop",
-          whatsappContact: "+22955468138",
-          taxRate: 0,
-          aboutTitle: "MAISON STEVENBMJ — L'OR ET LA COMPLICATION",
-          aboutTitleEn: "MAISON STEVENBMJ — RAW PRECIOUS MASS & COMPLICATIONS",
-          aboutContent: "Fondée sur le principe de la souveraineté esthétique absolue, la Maison StevenBmj fusionne l'artisanat milanais avec l'ingénierie horlogère suisse de pointe. Chaque pièce de notre catalogue est sculptée dans des matières nobles : or pur 24K, diamants rutilants de pureté VVS1, et cuirs au tannage minéral d'exception.",
-          aboutContentEn: "Founded on the principle of absolute aesthetic sovereignty, Maison StevenBmj fuses Milanese sartorial mastery with top-tier Swiss watchmaking. Every single piece in our vault is meticulously carved out of pristine elements: raw 24K gold, blazing VVS1 diamonds, and hand-tanned grade-A full grain leathers.",
-          contactTitle: "SALON PRIVÉ & SERVICES CONCIERGERIE",
-          contactTitleEn: "PRIVATE VAULT & CONCIERGE SERVICES",
-          contactAddress: "Avenue du Prestige, Quartier Akpakpa, Cotonou, Bénin. (En face de la Zone Résidentielle)",
-          contactAddressEn: "Prestige Avenue, Akpakpa District, Cotonou, Benin. (Opposite the Residential Enclave)",
-          googleMapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3972.482701053427!2d2.463388!3d6.360155!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x102355db7cb9b51%3A0xbc78051743e47fdc!2sAkpakpa%2C%20Cotonou!5e0!3m2!1sfr!2sbj!4v1700000000000",
-          careTitle: "ATELIER CARE & SOUVERAINETÉ",
-          careTitleEn: "ATELIER SOUVERAIN CARE",
-          careContent: "Une question sur une taille, un ajustement sur-mesure ou une commande haute couture ? Notre service de conciergerie privée vous répond sous 15 minutes, 24/7.",
-          careContentEn: "Any height adjustment or custom sewing request? Our private elite concierge will reply within 15 minutes, 24/7.",
-          footerText: "StevenBmj est une marque déposée de la Maison de Haute Couture Souveraine. L'élégance n'est pas une attitude, c'est une complication.",
-          footerTextEn: "StevenBmj is a registered trademark of the Sovereign Haute Couture House. Elegance is not an attitude, it is a complication.",
-          footerCredits: "© 2026 StevenBmj. Conçu pour l'élite mondiale.",
-          footerCreditsEn: "© 2026 StevenBmj. Curated for the global elite.",
-          instagramUrl: "https://instagram.com",
-          facebookUrl: "https://www.facebook.com/share/1F3vVmSiGw/",
-          whatsappUrl: "https://wa.me/22955468138",
-          storyTitleFr: "L'Art de Vivre sans Compromis sur le Raffinement",
-          storyTitleEn: "The Craft of Absolute and Timeless Masculine Silhouette",
-          storyDescFr: "Fondée sur l'excellence horlogère des plus hauts calibres, la Maison StevenBmj imagine un vestiaire d'exception où s'unissent des lignes géométriques avant-gardistes et une orfèvrerie étincelante. Nos diamants sont sertis main et nos mocassins crêpes taillés dans les plus hauts grades de suède d'Italie.",
-          storyDescEn: "Formed upon the highest peaks of horological art, the Maison StevenBmj crafts an elite gentlemen vestiary merging sharp architectural lines with glittering hand-paved 18k diamonds and authentic Italian crepe loafers.",
-          storyImage: "https://images.unsplash.com/photo-1551537482-f2075a1d41f2?q=80&w=600&auto=format&fit=crop",
-          fabric1TitleFr: "Tissu de Prestige \"Good Luck\"",
-          fabric1TitleEn: "Prestige Fabric \"Good Luck\"",
-          fabric1DescFr: "Tissage jacquard de soie d'une brillance spectaculaire aux arabesques dorées, plébiscitée par l'élite et apportant bénédiction et fortune aux chefs d'influence.",
-          fabric1DescEn: "Spectacular silk jacquard weave with golden arabesques, favored by elite circles, believed to summon luxury and fortune.",
-          fabric1Image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=600&auto=format&fit=crop",
-          fabric2TitleFr: "Super-Wax Vlisco Hollandais",
-          fabric2TitleEn: "Authentic Vlisco Dutch Super-Wax",
-          fabric2DescFr: "L'authentique pièce de coton dense double face à base de cire naturelle. Couleurs inaltérables et tracés millimétriques d'une pureté de design extraordinaire.",
-          fabric2DescEn: "The original high-density double-sided cotton wax premium block. Natural waxes and precision designs.",
-          fabric2Image: "https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=600&auto=format&fit=crop",
-          fabric3TitleFr: "Brocart de Soie de Saint-Gall",
-          fabric3TitleEn: "Swiss St. Gallen Silk Brocade",
-          fabric3DescFr: "Importé du canton historique textile en Suisse. Un satin broché rigide sculpté en reliefs d'or pour dessiner les plus prestigieux apparats souverains de la haute noblesse.",
-          fabric3DescEn: "Imported from the historical Swiss textile capital. Stiff satin broché carved with gold relief.",
-          fabric3Image: "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?q=80&w=600&auto=format&fit=crop",
-          bento1TitleFr: "Horlogerie Royale de Prestige",
-          bento1TitleEn: "Royal Horology of Prestige",
-          bento1DescFr: "Chronographes automatiques d'influence à remontage automatique, verre saphir inrayable et boîtiers lunettes cannelées.",
-          bento1DescEn: "Self-winding automatic influence chronographs, scratch-resistant sapphire crystal and fluted bezels.",
-          bento1Image: "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600&auto=format&fit=crop",
-          bento2TitleFr: "Maillons & Or 18k",
-          bento2TitleEn: "Chains & 18k Gold",
-          bento2DescFr: "Chaînes de cou iconiques, bagues biseautées et bracelets massifs en or pur.",
-          bento2DescEn: "Iconic neck chains, heavy bevelled rings and massive pure gold bracelets.",
-          bento2Image: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=600&auto=format&fit=crop",
-          bento3TitleFr: "Crepe Loafers & Silouhettes",
-          bento3TitleEn: "Crepe Loafers & Silhouettes",
-          bento3DescFr: "Mocassins luxurieux à semelle gomme crêpe naturelle, alliance ultime du confort et de l'élégance.",
-          bento3DescEn: "Luxurious loafers featuring natural crepe rubber soles, the ultimate alliance of comfort and sharp elegance.",
-          bento3Image: "https://images.unsplash.com/photo-1533867617858-e7b97e060509?q=80&w=600&auto=format&fit=crop",
-          bento4TitleFr: "Tailoring & Costumes sur Mesure",
-          bento4TitleEn: "Tailoring & Bespoke Suits",
-          bento4DescFr: "Laine extra-fine mérinos, cachemire doublé et vestes structurées croisées aux boutons ciselés d'or.",
-          bento4DescEn: "Extra-fine merino wool, full cashmere double lining, and double-breasted jackets.",
-          bento4Image: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=1600&auto=format&fit=crop"
+          "homepageHeroTitle": "StevenBmj",
+          "homepageHeroTitleEn": "StevenBmj",
+          "homepageHeroSubtitle": "Mode et accessoires pour hommes, femmes et enfants.",
+          "homepageHeroSubtitleEn": "Fashion and accessories for men, women and children.",
+          "whatsappContact": "+2290155468138",
+          "taxRate": 0,
+          "aboutTitle": "À propos de StevenBmj",
+          "aboutTitleEn": "About StevenBmj",
+          "aboutContent": "Découvrez le catalogue StevenBmj et contactez notre équipe pour préparer votre commande.",
+          "aboutContentEn": "Explore the StevenBmj catalogue and contact our team to prepare your order.",
+          "contactTitle": "Contacter StevenBmj",
+          "contactTitleEn": "Contact StevenBmj",
+          "contactAddress": "Cotonou, Bénin",
+          "contactAddressEn": "Cotonou, Benin",
+          "careTitle": "Service client",
+          "careTitleEn": "Customer care",
+          "careContent": "Contactez notre équipe pour toute question sur un article ou une commande.",
+          "careContentEn": "Contact our team with any questions about an item or order.",
+          "footerText": "Mode et accessoires pour hommes, femmes et enfants.",
+          "footerTextEn": "Fashion and accessories for men, women and children.",
+          "facebookUrl": "https://www.facebook.com/share/1F3vVmSiGw/",
+          "whatsappUrl": "https://wa.me/2290155468138"
         };
 
         const merged = { ...settData };
@@ -231,10 +162,6 @@ export default function GodDashboard() {
       // Reviews
       const resR = await fetch('/api/reviews/admin');
       if (resR.ok) setReviewsList(await resR.json());
-
-      // Client Accounts from Database
-      const resU = await fetch('/api/auth/users');
-      if (resU.ok) setBackendUsers(await resU.json());
     } catch (err) {
       console.error("Error loaded admin dashboard data", err);
     }
@@ -272,20 +199,15 @@ export default function GodDashboard() {
   // Create Product Submit handler
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProduct?.name || !editingProduct?.price) return;
+    if (productSaving || imageUploading || !editingProduct?.name || !editingProduct?.price) return;
     
-    // Auto populate defaults
     const payload = {
       ...editingProduct,
-      specs: editingProduct.specs || [
-        { key: "Origine / Origin", value: "Atelier Paris" },
-        { key: "Garantie", value: "Certifiée Authentique (2 Ans)" }
-      ],
-      images: editingProduct.images && editingProduct.images.length > 0
-        ? editingProduct.images
-        : ["https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600&auto=format&fit=crop"]
+      specs: editingProduct.specs || [],
+      images: editingProduct.images || [],
     };
 
+    setProductSaving(true);
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
@@ -304,7 +226,7 @@ export default function GodDashboard() {
     } catch (err: any) {
       console.error(err);
       alert(err?.message || "Impossible d'enregistrer le produit.");
-    }
+    } finally { setProductSaving(false); }
   };
 
   // Delete Product
@@ -378,112 +300,6 @@ export default function GodDashboard() {
   };
 
   // Delete a specific registered customer account
-  const handleDeleteBackendUser = async (userId: string) => {
-    if (!confirm(language === 'FR' ? "Êtes-vous sûr de vouloir supprimer définitivement ce compte client ?" : "Are you sure you want to permanently delete this customer account?")) return;
-    try {
-      const res = await fetch(`/api/auth/users/${userId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setBackendUsers(prev => prev.filter(u => u.id !== userId));
-      } else {
-        const data = await res.json();
-        alert(data.error || "Erreur de suppression / Deletion error");
-      }
-    } catch (err) {
-      console.error("Error deleting user account", err);
-    }
-  };
-
-  // Wipe all registered customer accounts
-  const handleWipeAllBackendUsers = async () => {
-    if (!confirm(language === 'FR' ? "ATTENTION : Êtes-vous certain de vouloir EFFACER TOUS les comptes clients ? Cette action est irréversible." : "WARNING: Are you absolutely sure you want to WIPE ALL customer accounts? This action is irreversible.")) return;
-    try {
-      const res = await fetch('/api/auth/users', { method: 'DELETE' });
-      if (res.ok) {
-        setBackendUsers([]);
-        alert(language === 'FR' ? "Tous les comptes clients ont été effacés avec succès." : "All customer accounts have been wiped successfully.");
-      } else {
-        alert("Erreur / Error");
-      }
-    } catch (err) {
-      console.error("Error wiping all client accounts", err);
-    }
-  };
-
-  // Create/register a new customer account
-  const handleCreateBackendUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateUserError('');
-    setCreateUserSuccess('');
-
-    if (!newUserData.name || !newUserData.email || !newUserData.password) {
-      setCreateUserError(language === 'FR' ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields.");
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUserData)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setCreateUserSuccess(language === 'FR' ? "Compte client créé avec succès !" : "Customer account created successfully!");
-        setNewUserData({ name: '', email: '', password: '' });
-        setShowCreateUserForm(false);
-        // Reload users
-        const resU = await fetch('/api/auth/users');
-        if (resU.ok) setBackendUsers(await resU.json());
-      } else {
-        setCreateUserError(data.error || "Erreur lors de la création.");
-      }
-    } catch (err) {
-      setCreateUserError(language === 'FR' ? "Erreur de connexion intermittente." : "Intermittent connection error.");
-    }
-  };
-
-  // manual VIP actions
-  const handleVipSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingVip?.customerName || !editingVip?.whatsapp) return;
-    
-    if (editingVip.id) {
-      // update
-      setManualVips(prev => {
-        const next = prev.map(v => v.id === editingVip.id ? { ...v, ...editingVip } as any : v);
-        localStorage.setItem('sbmj_manual_vips', JSON.stringify(next));
-        return next;
-      });
-    } else {
-      // create
-      const newV = {
-        id: `vip-${Date.now()}`,
-        customerName: editingVip.customerName,
-        whatsapp: editingVip.whatsapp,
-        email: editingVip.email || `${editingVip.customerName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
-        orderCount: editingVip.orderCount || 0
-      };
-      setManualVips(prev => {
-        const next = [...prev, newV];
-        localStorage.setItem('sbmj_manual_vips', JSON.stringify(next));
-        return next;
-      });
-    }
-    
-    setEditingVip(null);
-    setShowVipForm(false);
-  };
-
-  const handleDeleteVip = (id: string) => {
-    if (!window.confirm("Voulez-vous révoquer les accès privilégiés de ce client VIP ?")) return;
-    setManualVips(prev => {
-      const next = prev.filter(v => v.id !== id);
-      localStorage.setItem('sbmj_manual_vips', JSON.stringify(next));
-      return next;
-    });
-  };
-
-
   // Announcements forms actions
   const handleAnnounceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -654,6 +470,7 @@ export default function GodDashboard() {
     }
   };
 
+  if (user?.isAdmin && user.mfaRequired) return <AdminMfa challenge />;
   if (!isAuthorized) {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-left" id="admin-login-screen">
@@ -662,8 +479,8 @@ export default function GodDashboard() {
           
           <div className="flex flex-col items-center space-y-2 text-center">
             <Logo size={60} />
-            <span className="text-xs font-mono tracking-[0.3em] text-red-500 uppercase font-bold">PORTAIL PRIVÉ SECURISE</span>
-            <h2 className="text-xl font-light text-white uppercase tracking-widest font-sans">STEVENBMJ ADMIN (GOD)</h2>
+            <span className="text-xs font-mono tracking-[0.3em] text-red-500 uppercase font-bold">{adminText("PORTAIL PRIVÉ SECURISE", language)}</span>
+            <h2 className="text-xl font-light text-white uppercase tracking-widest font-sans">{adminText("STEVENBMJ ADMIN (GOD)", language)}</h2>
           </div>
 
           {loginError && (
@@ -687,7 +504,7 @@ export default function GodDashboard() {
               )}
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">E-Mail d'Administration *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("E-Mail d'Administration *", language)}</label>
                 <input
                   type="email"
                   required
@@ -769,7 +586,7 @@ export default function GodDashboard() {
           ) : (
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Identifiant / E-Mail *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Identifiant / E-Mail *", language)}</label>
                 <input
                   id="admin-login-username"
                   type="text"
@@ -782,7 +599,7 @@ export default function GodDashboard() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Code Secret d'Accès *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Code Secret d'Accès *", language)}</label>
                 <div className="relative">
                   <input
                     id="admin-login-password"
@@ -809,13 +626,11 @@ export default function GodDashboard() {
                 disabled={loginLoading || authLoading}
                 type="submit"
                 className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-[10.5px] font-bold uppercase tracking-widest rounded cursor-pointer duration-300 transition-all active:scale-[0.98] text-center"
-              >
-                ÉTABLIR LA CONNEXION DIRECTE
-              </button>
+              >{adminText("ÉTABLIR LA CONNEXION DIRECTE", language)}</button>
 
               <div className="relative flex py-1.5 items-center">
                 <div className="flex-grow border-t border-white/5"></div>
-                <span className="flex-shrink mx-3 text-neutral-600 text-[9px] font-mono">OU</span>
+                <span className="flex-shrink mx-3 text-neutral-600 text-[9px] font-mono">{adminText("OU", language)}</span>
                 <div className="flex-grow border-t border-white/5"></div>
               </div>
 
@@ -969,8 +784,7 @@ export default function GodDashboard() {
             <div className="space-y-6">
               
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                  CATALOGUE DE PIÈCES HAUT DE GAMME ({products.length})
+                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">{adminText("CATALOGUE DE PIÈCES HAUT DE GAMME (", language)}{products.length})
                 </h3>
                 <button
                   id="btn-admin-add-product-trigger"
@@ -982,7 +796,7 @@ export default function GodDashboard() {
                       category: 'watches',
                       price: 1500,
                       stock: 5,
-                      rating: 4.8,
+                      rating: 0,
                       description: '',
                       descriptionEn: '',
                       images: []
@@ -992,7 +806,7 @@ export default function GodDashboard() {
                   className="px-4 py-2 bg-red-600 text-white rounded text-xs uppercase font-mono tracking-widest hover:bg-red-500 duration-300 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>AJOUTER UNE CRÉATION</span>
+                  <span>{adminText("AJOUTER UNE CRÉATION", language)}</span>
                 </button>
               </div>
 
@@ -1000,12 +814,12 @@ export default function GodDashboard() {
               {showProductForm && editingProduct && (
                 <form onSubmit={handleProductSubmit} className="bg-neutral-900 border border-white/10 p-6 rounded-lg space-y-4 text-left">
                   <h4 className="text-xs font-mono tracking-widest text-red-400 uppercase font-bold border-b border-white/5 pb-2">
-                    {editingProduct.name ? "MODIFICATION DE CRÉATION DE PRESTIGE" : "CONSIGNATION D'UNE CRÉATION LUXE"}
+                    {language === 'FR' ? (editingProduct.name ? 'Modifier le produit' : 'Ajouter un produit') : (editingProduct.name ? 'Edit product' : 'Add product')}
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Nom Français *</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Nom Français *", language)}</label>
                       <input
                         id="form-p-name-fr"
                         type="text"
@@ -1017,7 +831,7 @@ export default function GodDashboard() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Nom Anglais *</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Nom Anglais *", language)}</label>
                       <input
                         id="form-p-name-en"
                         type="text"
@@ -1032,25 +846,25 @@ export default function GodDashboard() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="space-y-1 sm:col-span-2">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Catégorie *</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Catégorie *", language)}</label>
                       <select
                         id="form-p-category"
                         value={editingProduct.category || 'watches'}
                         onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as any })}
                         className="w-full bg-neutral-950 border border-white/10 text-xs px-2 py-2 text-neutral-400 font-mono"
                       >
-                        <option value="watches">watches (Montres de prestige)</option>
-                        <option value="chains">chains (Maillons cubains / Orfèvrerie)</option>
-                        <option value="suits">suits (Costumes de créateurs)</option>
-                        <option value="women">women (Maison Femme Act I)</option>
-                        <option value="perfumes">perfumes (Parfums d'élites)</option>
-                        <option value="shoes">shoes (Souliers & Mocassins crêpe)</option>
-                        <option value="accessories">accessories (Bagues / Accessoires élégants)</option>
+                        <option value="watches">{adminText("watches (Montres de prestige)", language)}</option>
+                        <option value="chains">{adminText("chains (Maillons cubains / Orfèvrerie)", language)}</option>
+                        <option value="suits">{adminText("suits (Costumes de créateurs)", language)}</option>
+                        <option value="women">{adminText("women (Maison Femme Act I)", language)}</option>
+                        <option value="perfumes">{adminText("perfumes (Parfums d'élites)", language)}</option>
+                        <option value="shoes">{adminText("shoes (Souliers & Mocassins crêpe)", language)}</option>
+                        <option value="accessories">{adminText("accessories (Bagues / Accessoires élégants)", language)}</option>
                       </select>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Tarif de base (€) *</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Tarif de base (€) *", language)}</label>
                       <input
                         id="form-p-price"
                         type="number"
@@ -1062,7 +876,7 @@ export default function GodDashboard() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Stock Garanti *</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Stock Garanti *", language)}</label>
                       <input
                         id="form-p-stock"
                         type="number"
@@ -1076,7 +890,7 @@ export default function GodDashboard() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Tarif Promo (€) (Optionnel)</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Tarif Promo (€) (Optionnel)", language)}</label>
                       <input
                         id="form-p-promoprice"
                         type="number"
@@ -1087,20 +901,20 @@ export default function GodDashboard() {
                     </div>
                     
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">Badge d'Édition (Ex: Édition Limitée)</label>
+                      <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Badge d'Édition (Ex: Édition Limitée)", language)}</label>
                       <input
                         id="form-p-badge"
                         type="text"
                         value={editingProduct.badge || ''}
                         onChange={(e) => setEditingProduct({ ...editingProduct, badge: e.target.value })}
                         className="w-full bg-neutral-950 border border-white/10 text-xs px-3 py-2 text-white placeholder-neutral-750"
-                        placeholder="Chef d'Œuvre"
+                        placeholder={adminText("Chef d'Œuvre", language)}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Images du Produit (Liens URL séparés par des virgules) *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Images du Produit (Liens URL séparés par des virgules) *", language)}</label>
                     <textarea
                       id="form-p-images"
                       required
@@ -1116,45 +930,39 @@ export default function GodDashboard() {
                       <label className="cursor-pointer border border-dashed border-white/20 hover:border-amber-500/30 bg-black/50 hover:bg-black/90 px-4 py-3 rounded text-center block transition-all duration-300">
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/png,image/jpeg,image/webp"
                           multiple
                           className="hidden"
-                          onChange={(e) => {
-                            const files = e.target.files;
-                            if (!files || files.length === 0) return;
-                            
-                            const promises = Array.from(files).map((file: any) => {
-                              return new Promise<string>((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  resolve(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              });
-                            });
-                            
-                            Promise.all(promises).then(base64Images => {
-                              const existingImages = editingProduct.images || [];
-                              setEditingProduct({
-                                ...editingProduct,
-                                images: [...existingImages, ...base64Images]
-                              });
-                              alert(`${base64Images.length} image(s) chargée(s) avec succès !`);
-                            });
+                          disabled={imageUploading || productSaving}
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length || imageUploading) return;
+                            if (files.length + (editingProduct.images?.length || 0) > 8 || files.some(file => file.size > 3_000_000 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))) {
+                              alert(language === 'FR' ? 'Maximum : 8 images PNG, JPEG ou WebP, de 3 Mo chacune.' : 'Maximum: 8 PNG, JPEG or WebP images, 3 MB each.'); return;
+                            }
+                            setImageUploading(true);
+                            try {
+                              for (const file of files) {
+                                const image = await new Promise<string>((resolve, reject) => {
+                                  const reader = new FileReader();
+                                  reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error()); reader.readAsDataURL(file);
+                                });
+                                const response = await fetch('/api/product-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image }) });
+                                const data = await response.json();
+                                if (!response.ok || typeof data.url !== 'string') throw new Error();
+                                setEditingProduct(previous => previous ? { ...previous, images: [...(previous.images || []), data.url] } : previous);
+                              }
+                            } catch { alert(language === 'FR' ? 'Une image n’a pas été transférée. Réessayez avant d’enregistrer le produit.' : 'An image could not be uploaded. Retry before saving the product.'); }
+                            finally { setImageUploading(false); }
                           }}
                         />
-                        <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-bold">
-                          📂 + IMPORTER UNE COMPOSITION DEPUIS MON APPAREIL
-                        </span>
-                        <p className="text-[9px] text-neutral-500 uppercase mt-1 font-sans">
-                          Formats JPEG, PNG supportés. Conversion instantanée hégémonique.
-                        </p>
+                        <span className="text-[10px] font-mono text-amber-500 uppercase font-bold">{imageUploading ? (language === 'FR' ? 'Transfert en cours…' : 'Uploading…') : (language === 'FR' ? 'Importer des images' : 'Upload images')}</span>
                       </label>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description textuelle Française *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description textuelle Française *", language)}</label>
                     <textarea
                       id="form-p-desc-fr"
                       required
@@ -1166,7 +974,7 @@ export default function GodDashboard() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description textuelle Anglaise *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description textuelle Anglaise *", language)}</label>
                     <textarea
                       id="form-p-desc-en"
                       required
@@ -1185,15 +993,12 @@ export default function GodDashboard() {
                         setEditingProduct(null);
                       }}
                       className="px-4 py-2 bg-neutral-850 hover:bg-neutral-800 text-neutral-400 font-mono text-xs rounded"
-                    >
-                      ANNULER
-                    </button>
+                    >{adminText("ANNULER", language)}</button>
                     <button
                       type="submit"
+                      disabled={productSaving || imageUploading}
                       className="px-6 py-2 bg-red-600 text-white font-mono text-xs font-bold rounded"
-                    >
-                      SANS FAUTE ET ENREGISTRER
-                    </button>
+                    >{adminText("SANS FAUTE ET ENREGISTRER", language)}</button>
                   </div>
                 </form>
               )}
@@ -1203,12 +1008,12 @@ export default function GodDashboard() {
                 <table className="w-full text-left text-xs text-neutral-400 border-collapse">
                   <thead>
                     <tr className="border-b border-white/5 bg-neutral-900/40 text-neutral-400 uppercase font-mono text-[9px]">
-                      <th className="p-4">IMAGINATION</th>
-                      <th className="p-4">PIÈCE DESIGNATION</th>
-                      <th className="p-4">CATÉGORIE</th>
-                      <th className="p-4">TARIF NET</th>
-                      <th className="p-4 text-center">STOCK</th>
-                      <th className="p-4 text-center">CONTROLES</th>
+                      <th className="p-4">{adminText("IMAGINATION", language)}</th>
+                      <th className="p-4">{adminText("PIÈCE DESIGNATION", language)}</th>
+                      <th className="p-4">{adminText("CATÉGORIE", language)}</th>
+                      <th className="p-4">{adminText("TARIF NET", language)}</th>
+                      <th className="p-4 text-center">{adminText("STOCK", language)}</th>
+                      <th className="p-4 text-center">{adminText("CONTROLES", language)}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono">
@@ -1241,8 +1046,7 @@ export default function GodDashboard() {
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             p.stock === 0 ? 'bg-red-500/10 text-red-400' : 'bg-neutral-800 text-neutral-300'
                           }`}>
-                            {p.stock} Units
-                          </span>
+                            {p.stock}{adminText("Units", language)}</span>
                         </td>
                         <td className="p-4 text-center">
                           <div className="flex h-8 justify-center items-center space-x-2">
@@ -1253,7 +1057,7 @@ export default function GodDashboard() {
                                 setShowProductForm(true);
                               }}
                               className="p-1.5 hover:text-amber-400 hover:bg-white/5 rounded cursor-pointer duration-300"
-                              title="Modifier"
+                              title={adminText("Modifier", language)}
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -1261,7 +1065,7 @@ export default function GodDashboard() {
                               id={`btn-admin-del-${p.id}`}
                               onClick={() => handleDeleteProduct(p.id)}
                               className="p-1.5 hover:text-red-400 hover:bg-white/5 rounded cursor-pointer duration-300"
-                              title="Supprimer"
+                              title={adminText("Supprimer", language)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1283,8 +1087,7 @@ export default function GodDashboard() {
             <div className="space-y-6">
               
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                  GÉNÉRATEUR DE RÉDUCTIONS ET SOUVERAINTÉ TARIFS ({promos.length})
+                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">{adminText("GÉNÉRATEUR DE RÉDUCTIONS ET SOUVERAINTÉ TARIFS (", language)}{promos.length})
                 </h3>
                 <button
                   id="btn-admin-add-promo"
@@ -1292,7 +1095,7 @@ export default function GodDashboard() {
                   className="px-4 py-2 bg-neutral-900 border border-white/10 hover:border-amber-400 text-amber-400 rounded text-xs uppercase font-mono tracking-widest hover:bg-neutral-950 duration-300 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>CRÉER UN COUPON</span>
+                  <span>{adminText("CRÉER UN COUPON", language)}</span>
                 </button>
               </div>
 
@@ -1300,7 +1103,7 @@ export default function GodDashboard() {
               {showPromoForm && (
                 <form onSubmit={handlePromoSubmit} className="bg-neutral-900 p-5 rounded-lg border border-white/5 flex flex-col md:flex-row gap-4 justify-between items-end text-left">
                   <div className="space-y-1 w-full max-w-[12rem]">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Code Unique *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Code Unique *", language)}</label>
                     <input
                       id="form-promo-code"
                       type="text"
@@ -1313,7 +1116,7 @@ export default function GodDashboard() {
                   </div>
 
                   <div className="space-y-1 w-full max-w-[8rem]">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Réduction (%) *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Réduction (%) *", language)}</label>
                     <input
                       id="form-promo-percent"
                       type="number"
@@ -1327,20 +1130,20 @@ export default function GodDashboard() {
                   </div>
 
                   <div className="space-y-1 w-full max-w-[14rem]">
-                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">Durée de Validité *</label>
+                    <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Durée de Validité *", language)}</label>
                     <select
                       value={promoDurationHours}
                       onChange={(e) => setPromoDurationHours(e.target.value)}
                       className="w-full bg-neutral-950 border border-white/10 text-xs px-3 py-2 text-neutral-400 font-mono focus:outline-none"
                     >
-                      <option value="0.083">5 Minutes (Alerte test rapide)</option>
-                      <option value="1">1 Heure (Flash Exceptionnel)</option>
-                      <option value="6">6 Heures</option>
-                      <option value="24">24 Heures (1 Jour officiel)</option>
-                      <option value="72">3 Jours (Week-End)</option>
-                      <option value="168">7 Jours (Exceptionnel)</option>
-                      <option value="720">30 Jours (1 Mois)</option>
-                      <option value="eternal">Pas de limite (Éternel)</option>
+                      <option value="0.083">{adminText("5 Minutes (Alerte test rapide)", language)}</option>
+                      <option value="1">{adminText("1 Heure (Flash Exceptionnel)", language)}</option>
+                      <option value="6">{adminText("6 Heures", language)}</option>
+                      <option value="24">{adminText("24 Heures (1 Jour officiel)", language)}</option>
+                      <option value="72">{adminText("3 Jours (Week-End)", language)}</option>
+                      <option value="168">{adminText("7 Jours (Exceptionnel)", language)}</option>
+                      <option value="720">{adminText("30 Jours (1 Mois)", language)}</option>
+                      <option value="eternal">{adminText("Pas de limite (Éternel)", language)}</option>
                     </select>
                   </div>
 
@@ -1348,9 +1151,7 @@ export default function GodDashboard() {
                     id="btn-submit-promo"
                     type="submit"
                     className="px-5 py-2 bg-amber-400 text-black font-mono font-bold text-xs content-center cursor-pointer h-9 rounded"
-                  >
-                    AJOUTER CODE
-                  </button>
+                  >{adminText("AJOUTER CODE", language)}</button>
                 </form>
               )}
 
@@ -1359,11 +1160,11 @@ export default function GodDashboard() {
                 <table className="w-full text-left text-xs text-neutral-400 border-collapse">
                   <thead>
                     <tr className="border-b border-white/5 bg-neutral-900/40 text-neutral-400 uppercase font-mono text-[9px]">
-                      <th className="p-4">CODE PROMO</th>
-                      <th className="p-4">VALEUR DE COUPURE</th>
-                      <th className="p-4">ECHEANCE / DELAI</th>
-                      <th className="p-4 text-center">STATUT & ACTION INTERACTION</th>
-                      <th className="p-4 text-center">RETRANCHEMENTS</th>
+                      <th className="p-4">{adminText("CODE PROMO", language)}</th>
+                      <th className="p-4">{adminText("VALEUR DE COUPURE", language)}</th>
+                      <th className="p-4">{adminText("ECHEANCE / DELAI", language)}</th>
+                      <th className="p-4 text-center">{adminText("STATUT & ACTION INTERACTION", language)}</th>
+                      <th className="p-4 text-center">{adminText("RETRANCHEMENTS", language)}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono">
@@ -1374,34 +1175,32 @@ export default function GodDashboard() {
                       return (
                         <tr key={pr.code} className="hover:bg-white/5 transition-colors">
                           <td className="p-4 text-white font-bold">{pr.code}</td>
-                          <td className="p-4 font-semibold text-amber-500">-{pr.discountPercentage}% de réduction directe</td>
+                          <td className="p-4 font-semibold text-amber-500">-{pr.discountPercentage}{adminText("% de réduction directe", language)}</td>
                           <td className="p-4 text-[10px] text-neutral-500">
                             {pr.expiresAt ? (
                               isExpired ? (
-                                <span className="text-red-400">EXPIRÉ LE {new Date(pr.expiresAt).toLocaleString('fr-FR')}</span>
+                                <span className="text-red-400">{adminText("EXPIRÉ LE", language)}{new Date(pr.expiresAt).toLocaleString('fr-FR')}</span>
                               ) : (
-                                <span className="text-cyan-400 font-bold">EXPIRE LE {new Date(pr.expiresAt).toLocaleString('fr-FR')}</span>
+                                <span className="text-cyan-400 font-bold">{adminText("EXPIRE LE", language)}{new Date(pr.expiresAt).toLocaleString('fr-FR')}</span>
                               )
                             ) : (
-                              <span className="text-neutral-500 italic">ÉTERNEL</span>
+                              <span className="text-neutral-500 italic">{adminText("ÉTERNEL", language)}</span>
                             )}
                           </td>
                           <td className="p-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
                               {activeAndNotExpired ? (
-                                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded font-bold uppercase">
-                                  ACTIF
-                                </span>
+                                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded font-bold uppercase">{adminText("ACTIF", language)}</span>
                               ) : (
                                 <span className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded font-bold uppercase">
-                                  {isExpired ? 'DESACTIVÉ (EXPIRÉ)' : 'INACTIF'}
+                                  {isExpired ? adminText("DESACTIVÉ (EXPIRÉ)", language) : adminText("INACTIF", language)}
                                 </span>
                               )}
                               <button
                                 onClick={() => handleTogglePromo(pr.code)}
                                 className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-400/55 rounded text-[10px] text-amber-400 duration-200 cursor-pointer uppercase"
                               >
-                                {activeAndNotExpired ? 'Désactiver' : 'Réactiver'}
+                                {activeAndNotExpired ? adminText("Désactiver", language) : adminText("Réactiver", language)}
                               </button>
                             </div>
                           </td>
@@ -1424,510 +1223,15 @@ export default function GodDashboard() {
             </div>
           )}
 
-          {/* TAB 5: CLIENTÈLE VIP */}
-          {activeTab === 'users' && (() => {
-            // Aggregate VIPs from actual orders
-            const orderVipsMap = new Map<string, { customerName: string; email: string; whatsapp: string; orderCount: number; spend: number }>();
-            orders.forEach(o => {
-              const whatsappKey = (o.whatsapp || '').trim().replace(/\s+/g, '').toLowerCase();
-              if (!whatsappKey) return;
-              const existing = orderVipsMap.get(whatsappKey);
-              if (existing) {
-                existing.orderCount += 1;
-                existing.spend += o.totalPrice || 0;
-              } else {
-                orderVipsMap.set(whatsappKey, {
-                  customerName: o.customerName || 'Client d\'exception',
-                  email: o.email || '',
-                  whatsapp: o.whatsapp || '',
-                  orderCount: 1,
-                  spend: o.totalPrice || 0
-                });
-              }
-            });
-
-            const aggregatedVipsList = Array.from(orderVipsMap.values());
-
-            // Merge with manual VIPs
-            const combinedVips = [...aggregatedVipsList];
-            manualVips.forEach(mv => {
-              const mvKey = mv.whatsapp.trim().replace(/\s+/g, '').toLowerCase();
-              const foundIdx = combinedVips.findIndex(cv => cv.whatsapp.trim().replace(/\s+/g, '').toLowerCase() === mvKey);
-              if (foundIdx !== -1) {
-                // merge / sum counts
-                combinedVips[foundIdx].orderCount += mv.orderCount || 0;
-              } else {
-                combinedVips.push({
-                  customerName: mv.customerName,
-                  email: mv.email,
-                  whatsapp: mv.whatsapp,
-                  orderCount: mv.orderCount || 0,
-                  spend: (mv.orderCount || 0) * 850 // estimate value
-                });
-              }
-            });
-
-            // Filter by search query
-            const filteredVips = combinedVips.filter(v => {
-              const q = vipSearchQuery.toLowerCase().trim();
-              if (!q) return true;
-              return v.customerName.toLowerCase().includes(q) || 
-                     v.email.toLowerCase().includes(q) || 
-                     v.whatsapp.includes(q);
-            });
-
-            return (
-              <div className="space-y-6 animate-fade-in text-left">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/5 pb-4 gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                      RÉGISTRY CONCIERGERIE VIP STEVENBMJ
-                    </h3>
-                    <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                      {filteredVips.length} Clients identifiés d'Excellence & de fidélité
-                    </p>
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      setEditingVip({ customerName: '', whatsapp: '', email: '', orderCount: 0 });
-                      setShowVipForm(true);
-                    }}
-                    className="px-4 py-2 bg-amber-400 text-black text-xs font-mono font-bold uppercase hover:bg-amber-300 rounded cursor-pointer duration-250 flex items-center space-x-2 shrink-0 self-start sm:self-auto"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>ENREGISTRER UN CLIENT PRIVILÉGIÉ</span>
-                  </button>
-                </div>
-
-                {/* VIP SEARCH BAR */}
-                <div className="bg-neutral-950 p-3 border border-white/5 rounded-lg flex items-center space-x-3">
-                  <Search className="w-4 h-4 text-amber-500" />
-                  <input
-                    type="text"
-                    value={vipSearchQuery}
-                    onChange={(e) => setVipSearchQuery(e.target.value)}
-                    placeholder="Rechercher par nom d'hôte, de client, WhatsApp, ou email..."
-                    className="w-full bg-transparent border-none text-xs text-white focus:outline-none placeholder-neutral-705 font-mono"
-                  />
-                  {vipSearchQuery && (
-                    <button
-                      onClick={() => setVipSearchQuery('')}
-                      className="text-neutral-500 hover:text-white font-mono text-[10px] uppercase cursor-pointer"
-                    >
-                      [RESTAURER]
-                    </button>
-                  )}
-                </div>
-
-                {/* VIP CRUD FORM DRAWER */}
-                {showVipForm && editingVip && (
-                  <form onSubmit={handleVipSubmit} className="bg-neutral-900 border border-white/10 p-5 rounded-lg space-y-4">
-                    <h4 className="text-xs font-mono tracking-widest text-amber-400 font-bold uppercase border-b border-white/5 pb-2">
-                      {editingVip.id ? "MODIFIER LE PROFIL DE LUGRE COUTURIER" : "AFFILIER NOUVEAU MEMBRE VIP"}
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-neutral-500 uppercase block">Nom Complet *</label>
-                        <input
-                          type="text"
-                          required
-                          value={editingVip.customerName}
-                          onChange={(e) => setEditingVip({ ...editingVip, customerName: e.target.value })}
-                          className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white"
-                          placeholder="Ex: Richard Mille"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-neutral-500 uppercase block">WhatsApp Direct *</label>
-                        <input
-                          type="text"
-                          required
-                          value={editingVip.whatsapp}
-                          onChange={(e) => setEditingVip({ ...editingVip, whatsapp: e.target.value })}
-                          className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white"
-                          placeholder="Ex: +33612345678"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-neutral-500 uppercase block">Email Personnel</label>
-                        <input
-                          type="email"
-                          value={editingVip.email}
-                          onChange={(e) => setEditingVip({ ...editingVip, email: e.target.value })}
-                          className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white"
-                          placeholder="Ex: richard@mille.com"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingVip(null);
-                          setShowVipForm(false);
-                        }}
-                        className="px-4 py-2 bg-neutral-800 text-neutral-400 text-[10px] font-mono uppercase rounded hover:bg-neutral-700 cursor-pointer"
-                      >
-                        Annuler
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-amber-400 text-black text-[10px] font-mono font-bold uppercase rounded hover:bg-amber-300 cursor-pointer animate-pulse"
-                      >
-                        Enregistrer Profil VIP
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {selectedVipForMsg && <VipMessageComposer key={selectedVipForMsg.email || selectedVipForMsg.whatsapp} recipient={selectedVipForMsg} close={() => setSelectedVipForMsg(null)} />}
-
-                {/* VIP LIST IN STUNNING CARDS AND DYNAMIC COLOURS */}
-                {filteredVips.length === 0 ? (
-                  <div className="text-center py-16 border border-dashed border-white/5 text-neutral-500 font-mono text-xs uppercase rounded-lg">
-                    Aucun hôte de marque ne correspond à votre recherche.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredVips.map((vip, i) => {
-                      // Compute dynamic high-end badges and colors based on validated order count/frequency
-                      let badgeName = "VIP Hôte";
-                      let badgeClasses = "bg-neutral-800 text-neutral-300 border border-neutral-700";
-                      let avatarGlowClass = "border-neutral-500 shadow-[0_0_8px_rgba(115,115,115,0.2)]";
-
-                      if (vip.orderCount >= 5) {
-                        badgeName = "SBMJ Ambassadeur Absolu";
-                        badgeClasses = "bg-rose-500/20 text-rose-400 border border-rose-500/30 font-extrabold animate-pulse";
-                        avatarGlowClass = "border-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.35)]";
-                      } else if (vip.orderCount >= 3) {
-                        badgeName = "VIP Orfèvre Prestige";
-                        badgeClasses = "bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold";
-                        avatarGlowClass = "border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.30)]";
-                      } else if (vip.orderCount >= 2) {
-                        badgeName = "VIP Acheteur Loyal";
-                        badgeClasses = "bg-sky-500/10 text-sky-400 border border-sky-500/30";
-                        avatarGlowClass = "border-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.25)]";
-                      }
-
-                      return (
-                        <div key={i} className="bg-neutral-950 p-5 rounded-lg border border-white/5 space-y-4 hover:border-white/10 transition-colors flex flex-col justify-between">
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex items-center space-x-3">
-                                {/* Elegant monogram avatar with dynamic border color based on badge frequency */}
-                                <div className={`w-9 h-9 rounded-full border bg-neutral-900 flex items-center justify-center font-serif text-sm font-bold text-white uppercase ${avatarGlowClass}`}>
-                                  {vip.customerName.charAt(0)}
-                                </div>
-                                <div className="text-left">
-                                  <h4 className="text-xs font-semibold text-white uppercase tracking-wider">{vip.customerName}</h4>
-                                  <span className={`inline-block text-[9px] uppercase px-2 py-0.5 mt-1 rounded font-mono ${badgeClasses}`}>
-                                    {badgeName}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <span className="text-[10px] font-mono text-neutral-500 text-right uppercase">
-                                Validations : <strong className="text-white text-xs">{vip.orderCount}</strong>
-                              </span>
-                            </div>
-
-                            {/* Info Lines */}
-                            <div className="space-y-1 text-[11px] font-mono text-neutral-400 border-t border-white/5 pt-3 text-left">
-                              <p className="flex justify-between">
-                                <span className="text-neutral-500">WHATSAPP:</span>
-                                <span className="text-neutral-200">{vip.whatsapp || "Non renseigné"}</span>
-                              </p>
-                              <p className="flex justify-between">
-                                <span className="text-neutral-500">E-MAIL PRIVÉ:</span>
-                                <span className="text-neutral-300 text-[10px]">{vip.email || "Non communiqué"}</span>
-                              </p>
-                              <p className="flex justify-between font-bold border-t border-white/5 pt-1 mt-1 text-[12px]">
-                                <span className="text-amber-500 uppercase text-[9px]">CA JOAILLERIE (ESTIMÉ) :</span>
-                                <span className="text-yellow-400">{formatPrice(vip.spend || vip.orderCount * 850)}</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex items-center justify-between pt-3 border-t border-white/5 text-[10px] font-mono gap-2">
-                            <div className="flex space-x-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingVip({ ...vip });
-                                  setShowVipForm(true);
-                                }}
-                                className="px-2.5 py-1.5 bg-neutral-900 border border-white/5 hover:border-amber-500/35 hover:text-amber-400 rounded text-neutral-400 transition-colors"
-                              >
-                                Modifier
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteVip(vip.customerName)}
-                                className="px-2.5 py-1.5 bg-neutral-900 border border-white/5 hover:bg-red-500/10 hover:text-red-400 rounded text-neutral-400 transition-colors"
-                              >
-                                Supprimer
-                              </button>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedVipForMsg(vip);
-                                setVipMsgSuccess(false);
-                                setVipMsgError('');
-                                setVipMsgLoading(false);
-                                setVipMsgBody('');
-                              }}
-                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black rounded font-bold uppercase cursor-pointer flex items-center space-x-1 duration-250 shrink-0"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5" />
-                              <span>MESSAGERIE DUAL</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* REGISTERED CUSTOMER ACCOUNTS (DATABASE) SECTION */}
-                <div className="border-t border-white/10 pt-8 mt-10">
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/5 pb-4 gap-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white uppercase tracking-widest text-amber-500">
-                        COMPTES CLIENTS ENREGISTRÉS DIRECTEMENT (BASE DE DONNÉES)
-                      </h3>
-                      <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                        {backendUsers.length} comptes authentifiés en base – Possibilité d'inscription souveraine
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setShowCreateUserForm(!showCreateUserForm);
-                          setCreateUserError('');
-                          setCreateUserSuccess('');
-                        }}
-                        className="px-4 py-2 border border-amber-500/20 hover:border-amber-400 bg-amber-500/5 text-amber-400 text-[10px] font-mono font-bold uppercase rounded cursor-pointer duration-250 flex items-center space-x-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>CRÉER UN COMPTE CLIENT</span>
-                      </button>
-
-                      <button
-                        onClick={handleWipeAllBackendUsers}
-                        className="px-4 py-2 border border-red-500/40 hover:bg-red-500/10 text-red-500 text-[10px] font-mono uppercase rounded cursor-pointer duration-250 font-bold"
-                      >
-                        TOUT EFFACER
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* CREATE USER FORM */}
-                  {showCreateUserForm && (
-                    <form onSubmit={handleCreateBackendUser} className="bg-neutral-900 border border-white/10 p-5 rounded-lg space-y-4 my-6">
-                      <h4 className="text-xs font-mono tracking-widest text-amber-500 font-bold uppercase border-b border-white/5 pb-2">
-                        CRÉER SOUVERAINEMENT UN NOUVEAU COMPTE CLIENT
-                      </h4>
-
-                      {createUserError && (
-                        <div className="p-2.5 bg-red-950/50 border border-red-500/20 text-red-400 rounded text-xs font-mono uppercase">
-                          {createUserError}
-                        </div>
-                      )}
-
-                      {createUserSuccess && (
-                        <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/20 text-emerald-400 rounded text-xs font-mono uppercase">
-                          {createUserSuccess}
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-mono text-neutral-500 uppercase block">Nom & Prénom *</label>
-                          <input
-                            type="text"
-                            required
-                            value={newUserData.name}
-                            onChange={(e) => setNewUserData({ ...newUserData, name: e.target.value })}
-                            className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white font-mono focus:border-amber-400 focus:outline-none"
-                            placeholder="Ex: Alexandre de Beauharnais"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-mono text-neutral-500 uppercase block">Adresse E-Mail *</label>
-                          <input
-                            type="email"
-                            required
-                            value={newUserData.email}
-                            onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                            className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white font-mono focus:border-amber-400 focus:outline-none"
-                            placeholder="Ex: alexandre@luxury.com"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-mono text-neutral-500 uppercase block">Mot de passe de départ *</label>
-                          <input
-                            type="password"
-                            required
-                            value={newUserData.password}
-                            onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                            className="w-full bg-neutral-950 border border-white/5 text-xs px-3 py-2 text-white font-mono focus:border-amber-400 focus:outline-none"
-                            placeholder="••••••••"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateUserForm(false)}
-                          className="px-4 py-2 bg-neutral-800 text-neutral-400 text-[10px] font-mono uppercase rounded hover:bg-neutral-700 cursor-pointer"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-2 bg-amber-400 text-black text-[10px] font-mono font-bold uppercase rounded hover:bg-amber-300 cursor-pointer"
-                        >
-                          CRÉER LE COMPTE
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  {backendUsers.length === 0 ? (
-                    <div className="text-center py-8 text-neutral-500 text-xs font-mono uppercase tracking-widest bg-neutral-950/50 border border-white/5 rounded-lg mt-4">
-                      Aucun compte enregistré en base de données.
-                    </div>
-                  ) : (
-                    <div className="bg-neutral-950 border border-white/5 rounded-lg overflow-hidden mt-4">
-                      <table className="w-full text-left border-collapse font-mono text-[11px]">
-                        <thead>
-                          <tr className="border-b border-white/10 bg-neutral-900 text-neutral-400">
-                            <th className="p-3 uppercase tracking-wider">Compte Client</th>
-                            <th className="p-3 uppercase tracking-wider">E-Mail</th>
-                            <th className="p-3 uppercase tracking-wider">Fidélité (VIP)</th>
-                            <th className="p-3 uppercase tracking-wider">Date d'adhésion</th>
-                            <th className="p-3 uppercase tracking-wider">Contact WhatsApp</th>
-                            <th className="p-3 uppercase tracking-wider text-right">Actions / Contact</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {backendUsers.map((bu, idx) => {
-                            // Automatically scan previous orders or VIP listings under this email to find their WhatsApp number info
-                            const matchedOrder = orders.find(o => o.email?.trim().toLowerCase() === bu.email.trim().toLowerCase());
-                            const matchedVip = combinedVips.find(v => v.email?.trim().toLowerCase() === bu.email.trim().toLowerCase());
-                            const detectedWhatsApp = (matchedOrder?.whatsapp || matchedVip?.whatsapp || '').trim();
-
-                            const handleContactWhatsApp = () => {
-                              let num = detectedWhatsApp;
-                              if (!num) {
-                                num = window.prompt(
-                                  language === 'FR'
-                                    ? `Aucun numéro de téléphone enregistré pour ${bu.name}.\nSaisissez le numéro WhatsApp de contact (ex: +22955468138) :`
-                                    : `No telephone number on file for ${bu.name}.\nEnter WhatsApp contact number (ex: +22955468138):`,
-                                  bu.whatsapp || ''
-                                ) || '';
-                              }
-                              if (num.trim()) {
-                                const cleanNum = num.trim().replace(/\s+/g, '').replace(/^\+/, '');
-                                const url = `https://wa.me/${cleanNum}?text=${encodeURIComponent(
-                                  language === 'FR'
-                                    ? `Bonjour ${bu.name}, nous vous contactons depuis le service conciergerie de la Maison StevenBmj.`
-                                    : `Hello ${bu.name}, we are contacting you from the elite concierge services of Maison StevenBmj.`
-                                )}`;
-                                window.open(url, '_blank');
-                              }
-                            };
-
-                            const emailSubject = encodeURIComponent(
-                              language === 'FR' 
-                                ? "Maison StevenBmj — Votre Salon Privé d'Exception" 
-                                : "Maison StevenBmj — Your High Fashion Private Vault"
-                            );
-                            const emailBody = encodeURIComponent(
-                              language === 'FR'
-                                ? `Cher(e) ${bu.name},\n\nNous espérons que vous vous portez à merveille. C'est un réel privilège de vous compter parmi les invités d'elite de notre Maison.\n\nCordialement,\nService Conciergerie Royale StevenBmj`
-                                : `Dear ${bu.name},\n\nWe hope this email finds you in exceptional standing. It is an absolute privilege to count you among our illustrious house members.\n\nWarm regards,\nStevenBmj Royal Concierge Services`
-                            );
-                            const emailMailto = `mailto:${bu.email}?subject=${emailSubject}&body=${emailBody}`;
-
-                            return (
-                              <tr key={bu.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                                <td className="p-3 font-semibold text-white uppercase">{bu.name}</td>
-                                <td className="p-3 text-neutral-350">{bu.email}</td>
-                                <td className="p-3 text-amber-500 font-bold">{bu.vipPoints} pts</td>
-                                <td className="p-3 text-neutral-450">{bu.dateJoined ? new Date(bu.dateJoined).toLocaleDateString() : 'N/A'}</td>
-                                <td className="p-3">
-                                  {detectedWhatsApp ? (
-                                    <span className="text-emerald-400 font-medium flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse transition-all"></span>
-                                      {detectedWhatsApp}
-                                    </span>
-                                  ) : (
-                                    <span className="text-neutral-600 italic">Non renseigné / No phone</span>
-                                  )}
-                                </td>
-                                <td className="p-3 text-right">
-                                  <div className="flex justify-end items-center gap-2">
-                                    <a
-                                      href={emailMailto}
-                                      title={language === 'FR' ? "Contacter par E-mail" : "Contact via E-mail"}
-                                      className="px-2.5 h-8 bg-neutral-900 border border-white/10 text-neutral-300 hover:text-white hover:border-amber-400/50 hover:bg-neutral-800 rounded transition-all duration-150 inline-flex items-center gap-1.5 text-[9px] uppercase font-bold"
-                                    >
-                                      <Mail className="w-3.5 h-3.5 text-amber-500" />
-                                      <span>MAIL</span>
-                                    </a>
-
-                                    <button
-                                      onClick={handleContactWhatsApp}
-                                      title={language === 'FR' ? "Contacter par WhatsApp" : "Contact via WhatsApp"}
-                                      className="px-2.5 h-8 bg-neutral-900 border border-white/10 text-neutral-300 hover:text-white hover:border-emerald-400/50 hover:bg-neutral-800 rounded cursor-pointer transition-all duration-150 inline-flex items-center gap-1.5 text-[9px] uppercase font-bold"
-                                    >
-                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                                      <span>WHATSAPP</span>
-                                    </button>
-
-                                    <button
-                                      onClick={() => handleDeleteBackendUser(bu.id)}
-                                      className="px-2 h-8 bg-red-950/40 border border-red-500/25 text-red-400 hover:text-white hover:bg-red-600 hover:border-red-600 rounded text-[9px] cursor-pointer transition-all duration-150 font-bold uppercase"
-                                      title={language === 'FR' ? "Révoquer le compte d'exception" : "Revoke account privileges"}
-                                    >
-                                      SUPPRIMER
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
+          {activeTab === 'users' && <CustomerManagement />}
 
           {/* TAB 8: ANNONCES GESTION */}
           {activeTab === 'announcements' && (
             <div className="space-y-6 animate-fade-in text-left font-mono">
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                    GESTION DES ANNONCES CYBER BOUTIQUE
-                  </h3>
-                  <p className="text-[10px] text-neutral-500 mt-1 uppercase">
-                    Faites des alertes flashs qui disparaissent après le délai de votre choix
-                  </p>
+                  <h3 className="text-sm font-semibold text-white uppercase tracking-widest">{adminText("GESTION DES ANNONCES CYBER BOUTIQUE", language)}</h3>
+                  <p className="text-[10px] text-neutral-500 mt-1 uppercase">{adminText("Faites des alertes flashs qui disparaissent après le délai de votre choix", language)}</p>
                 </div>
                 
                 <button
@@ -1936,19 +1240,17 @@ export default function GodDashboard() {
                   className="px-4 py-2 bg-red-650 font-bold hover:bg-neutral-800 border border-white/10 text-white rounded text-xs uppercase duration-250 flex items-center space-x-1 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>{showAnnForm ? "Fermer l'Atelier" : "RÉACTIVER UNE NOUVELLE ANNONCE"}</span>
+                  <span>{showAnnForm ? adminText("Fermer l'Atelier", language) : adminText("RÉACTIVER UNE NOUVELLE ANNONCE", language)}</span>
                 </button>
               </div>
 
               {showAnnForm && (
                 <form onSubmit={handleAnnounceSubmit} className="bg-neutral-900 border border-white/10 p-5 rounded-lg space-y-4">
-                  <h4 className="text-xs tracking-widest text-red-00 font-bold uppercase border-b border-white/5 pb-2">
-                    LANCER UN BULLETIN SOUVERAIN (DÉLAI LIMITE EXPRÈS)
-                  </h4>
+                  <h4 className="text-xs tracking-widest text-red-00 font-bold uppercase border-b border-white/5 pb-2">{adminText("LANCER UN BULLETIN SOUVERAIN (DÉLAI LIMITE EXPRÈS)", language)}</h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-500 uppercase block">Message (Français) *</label>
+                      <label className="text-[10px] text-neutral-500 uppercase block">{adminText("Message (Français) *", language)}</label>
                       <input
                         type="text"
                         required
@@ -1960,7 +1262,7 @@ export default function GodDashboard() {
                     </div>
                     
                     <div className="space-y-1">
-                      <label className="text-[10px] text-neutral-500 uppercase block">Message (Anglais) *</label>
+                      <label className="text-[10px] text-neutral-500 uppercase block">{adminText("Message (Anglais) *", language)}</label>
                       <input
                         type="text"
                         required
@@ -1973,22 +1275,22 @@ export default function GodDashboard() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-neutral-500 uppercase block">Délai avant Disparition automatique *</label>
+                    <label className="text-[10px] text-neutral-500 uppercase block">{adminText("Délai avant Disparition automatique *", language)}</label>
                     <select
                       value={newAnn.durationMinutes}
                       onChange={(e) => setNewAnn({ ...newAnn, durationMinutes: Number(e.target.value) })}
                       className="w-full bg-neutral-950 border border-white/10 text-xs px-3 py-2 text-neutral-400 font-mono"
                     >
-                      <option value="5">5 Minutes (Alerte test ultra-rapide)</option>
-                      <option value="10">10 Minutes</option>
-                      <option value="30">30 Minutes</option>
-                      <option value="60">1 Heure (Flash Sale Express)</option>
-                      <option value="360">6 Heures</option>
-                      <option value="720">12 Heures</option>
-                      <option value="1440">24 Heures (1 Jour officiel)</option>
-                      <option value="4320">3 Jours (Idéal Week-End)</option>
-                      <option value="10080">7 Jours (Exceptionnel)</option>
-                      <option value="52560000">Éternel (Ne disparaît jamais)</option>
+                      <option value="5">{adminText("5 Minutes (Alerte test ultra-rapide)", language)}</option>
+                      <option value="10">{adminText("10 Minutes", language)}</option>
+                      <option value="30">{adminText("30 Minutes", language)}</option>
+                      <option value="60">{adminText("1 Heure (Flash Sale Express)", language)}</option>
+                      <option value="360">{adminText("6 Heures", language)}</option>
+                      <option value="720">{adminText("12 Heures", language)}</option>
+                      <option value="1440">{adminText("24 Heures (1 Jour officiel)", language)}</option>
+                      <option value="4320">{adminText("3 Jours (Idéal Week-End)", language)}</option>
+                      <option value="10080">{adminText("7 Jours (Exceptionnel)", language)}</option>
+                      <option value="52560000">{adminText("Éternel (Ne disparaît jamais)", language)}</option>
                     </select>
                   </div>
 
@@ -1996,9 +1298,7 @@ export default function GodDashboard() {
                     <button
                       type="submit"
                       className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase rounded cursor-pointer duration-300 font-mono"
-                    >
-                      🚀 DIFFUSER IMMÉDIATEMENT SUR LA BOUTIQUE
-                    </button>
+                    >{adminText("🚀 DIFFUSER IMMÉDIATEMENT SUR LA BOUTIQUE", language)}</button>
                   </div>
                 </form>
               )}
@@ -2006,13 +1306,11 @@ export default function GodDashboard() {
               {/* LIST OF ACTIVE ANNOUNCEMENTS */}
               <div className="space-y-4">
                 <div className="border-b border-white/5 pb-2">
-                  <h4 className="text-[11px] text-neutral-400 uppercase tracking-widest">BULLETINS EN COURS DE DIFFUSION</h4>
+                  <h4 className="text-[11px] text-neutral-400 uppercase tracking-widest">{adminText("BULLETINS EN COURS DE DIFFUSION", language)}</h4>
                 </div>
 
                 {announcements.length === 0 ? (
-                  <div className="text-center py-12 border border-dashed border-white/5 text-neutral-600 text-xs uppercase">
-                    Aucune alerte temporaire n'est diffusée sur le site actuellement.
-                  </div>
+                  <div className="text-center py-12 border border-dashed border-white/5 text-neutral-600 text-xs uppercase">{adminText("Aucune alerte temporaire n'est diffusée sur le site actuellement.", language)}</div>
                 ) : (
                   <div className="grid grid-cols-1 gap-3">
                     {announcements.map((ann, idx) => {
@@ -2033,7 +1331,7 @@ export default function GodDashboard() {
                             
                             <div className="flex items-center space-x-2 pt-2 text-[10px]">
                               <span className={`h-1.5 w-1.5 rounded-full ${isExpired ? 'bg-neutral-600' : 'bg-red-500 animate-ping'}`} />
-                              <span className="text-neutral-550 uppercase">Lancée le: {createdAt.toLocaleString('fr-FR')}</span>
+                              <span className="text-neutral-550 uppercase">{adminText("Lancée le:", language)}{createdAt.toLocaleString('fr-FR')}</span>
                               <span className="text-neutral-500">•</span>
                               <span className={isExpired ? "text-neutral-600 uppercase font-bold" : "text-amber-500 uppercase font-bold"}>
                                 {timeLeftStr}
@@ -2045,7 +1343,7 @@ export default function GodDashboard() {
                             type="button"
                             onClick={() => handleDeleteAnnouncement(ann.id)}
                             className="p-2 bg-neutral-900 border border-white/10 text-red-00 hover:bg-neutral-800 rounded cursor-pointer duration-200 shrink-0"
-                            title="Retirer Bulletin"
+                            title={adminText("Retirer Bulletin", language)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -2063,17 +1361,13 @@ export default function GodDashboard() {
             <form onSubmit={handleSaveSettings} className="space-y-6 text-left">
               
               <div className="border-b border-white/5 pb-4">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                  GESTION DE CONTENU HOMEPAGE & BOUTIQUE
-                </h3>
-                <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                  Écrits, bannière défilante, contact d'ateliers
-                </p>
+                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">{adminText("GESTION DE CONTENU HOMEPAGE & BOUTIQUE", language)}</h3>
+                <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">{adminText("Écrits, bannière défilante, contact d'ateliers", language)}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Annonce Défilante (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Annonce Défilante (Français) *", language)}</label>
                   <input
                     id="sett-ann-fr"
                     type="text"
@@ -2084,7 +1378,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Annonce Défilante (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Annonce Défilante (Anglais) *", language)}</label>
                   <input
                     id="sett-ann-en"
                     type="text"
@@ -2098,7 +1392,7 @@ export default function GodDashboard() {
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Héro Landing Page (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Héro Landing Page (Français) *", language)}</label>
                   <input
                     id="sett-hero-fr"
                     type="text"
@@ -2109,7 +1403,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Héro Landing Page (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Héro Landing Page (Anglais) *", language)}</label>
                   <input
                     id="sett-hero-en"
                     type="text"
@@ -2123,7 +1417,7 @@ export default function GodDashboard() {
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description Héro Landing (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description Héro Landing (Français) *", language)}</label>
                   <textarea
                     id="sett-desc-fr"
                     required
@@ -2134,7 +1428,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description Héro Landing (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description Héro Landing (Anglais) *", language)}</label>
                   <textarea
                     id="sett-desc-en"
                     required
@@ -2148,7 +1442,7 @@ export default function GodDashboard() {
 
               <div className="grid grid-cols-2 gap-6 pt-2">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Contact WhatsApp Direct Concierge *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Contact WhatsApp Direct Concierge *", language)}</label>
                   <input
                     id="sett-wa-phone"
                     type="text"
@@ -2160,29 +1454,27 @@ export default function GodDashboard() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Indexation robots.txt / sitemap.xml SEO *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Indexation robots.txt / sitemap.xml SEO *", language)}</label>
                   <select
                     id="sett-seo-indexable"
+                    value={settings.seoIndexable === false ? 'false' : 'true'}
+                    onChange={event => setSettings({ ...settings, seoIndexable: event.target.value === 'true' })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 h-11 text-emerald-400 select-none cursor-pointer"
                   >
-                    <option value="true">INDEXATION FORCEE (SEO HIGH AGGRESSIVE)</option>
-                    <option value="false">DEVELOPMENT STAGE - NOINDEX</option>
+                    <option value="true">{adminText("INDEXATION FORCEE (SEO HIGH AGGRESSIVE)", language)}</option>
+                    <option value="false">{adminText("DEVELOPMENT STAGE - NOINDEX", language)}</option>
                   </select>
                 </div>
               </div>
 
               {/* SECTION: IMAGES DU CARROUSEL HERO */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">
-                  IMAGES DE DIAPORAMA DE LA BAVOLETTE HERO DE LA PAGE ACCUEIL
-                </h3>
-                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">
-                  Personnalisez souverainement les images coulissantes de l'accueil de luxe (par URL ou par Upload).
-                </p>
+                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">{adminText("IMAGES DE DIAPORAMA DE LA BAVOLETTE HERO DE LA PAGE ACCUEIL", language)}</h3>
+                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">{adminText("Personnalisez souverainement les images coulissantes de l'accueil de luxe (par URL ou par Upload).", language)}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">Image de Fond 1 *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">{adminText("Image de Fond 1 *", language)}</label>
                   <input
                     id="sett-hero-img-1"
                     type="text"
@@ -2190,7 +1482,7 @@ export default function GodDashboard() {
                     value={settings.homepageHeroImage1 || ''}
                     onChange={(e) => setSettings({ ...settings, homepageHeroImage1: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="URL ou code Base64 de l'image de fond..."
+                    placeholder={adminText("URL ou code Base64 de l'image de fond...", language)}
                   />
                   <div className="flex items-center space-x-2">
                     <input
@@ -2209,14 +1501,12 @@ export default function GodDashboard() {
                         }
                       }}
                     />
-                    <label htmlFor="upload-hero-1" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">
-                      ⬆ Charger Fichier 1
-                    </label>
-                    {settings.homepageHeroImage1 && <span className="text-[9px] text-emerald-400 font-mono">✓ Chargé</span>}
+                    <label htmlFor="upload-hero-1" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">{adminText("⬆ Charger Fichier 1", language)}</label>
+                    {settings.homepageHeroImage1 && <span className="text-[9px] text-emerald-400 font-mono">{adminText("✓ Chargé", language)}</span>}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">Image de Fond 2 *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">{adminText("Image de Fond 2 *", language)}</label>
                   <input
                     id="sett-hero-img-2"
                     type="text"
@@ -2224,7 +1514,7 @@ export default function GodDashboard() {
                     value={settings.homepageHeroImage2 || ''}
                     onChange={(e) => setSettings({ ...settings, homepageHeroImage2: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="URL ou code Base64 de l'image de fond 2..."
+                    placeholder={adminText("URL ou code Base64 de l'image de fond 2...", language)}
                   />
                   <div className="flex items-center space-x-2">
                     <input
@@ -2243,14 +1533,12 @@ export default function GodDashboard() {
                         }
                       }}
                     />
-                    <label htmlFor="upload-hero-2" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">
-                      ⬆ Charger Fichier 2
-                    </label>
-                    {settings.homepageHeroImage2 && <span className="text-[9px] text-emerald-400 font-mono">✓ Chargé</span>}
+                    <label htmlFor="upload-hero-2" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">{adminText("⬆ Charger Fichier 2", language)}</label>
+                    {settings.homepageHeroImage2 && <span className="text-[9px] text-emerald-400 font-mono">{adminText("✓ Chargé", language)}</span>}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">Image de Fond 3 *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold">{adminText("Image de Fond 3 *", language)}</label>
                   <input
                     id="sett-hero-img-3"
                     type="text"
@@ -2258,7 +1546,7 @@ export default function GodDashboard() {
                     value={settings.homepageHeroImage3 || ''}
                     onChange={(e) => setSettings({ ...settings, homepageHeroImage3: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="URL ou code Base64 de l'image de fond 3..."
+                    placeholder={adminText("URL ou code Base64 de l'image de fond 3...", language)}
                   />
                   <div className="flex items-center space-x-2">
                     <input
@@ -2277,77 +1565,71 @@ export default function GodDashboard() {
                         }
                       }}
                     />
-                    <label htmlFor="upload-hero-3" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">
-                      ⬆ Charger Fichier 3
-                    </label>
-                    {settings.homepageHeroImage3 && <span className="text-[9px] text-emerald-400 font-mono">✓ Chargé</span>}
+                    <label htmlFor="upload-hero-3" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">{adminText("⬆ Charger Fichier 3", language)}</label>
+                    {settings.homepageHeroImage3 && <span className="text-[9px] text-emerald-400 font-mono">{adminText("✓ Chargé", language)}</span>}
                   </div>
                 </div>
               </div>
 
               {/* SECTION: HOMEPAGE SECTION 2 (PHILOSOPHIE / STORY) */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">
-                  SECTION 2 DE L'ACCUEIL : PHILOSOPHIE & HISTOIRE DU SAVOIR-FAIRE
-                </h3>
-                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">
-                  Éditez les textes et l'image d'illustration de la philosophie de création.
-                </p>
+                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">{adminText("SECTION 2 DE L'ACCUEIL : PHILOSOPHIE & HISTOIRE DU SAVOIR-FAIRE", language)}</h3>
+                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">{adminText("Éditez les textes et l'image d'illustration de la philosophie de création.", language)}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Philosophie (FR) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Philosophie (FR) *", language)}</label>
                   <input
                     type="text"
                     required
                     value={settings.storyTitleFr || ''}
                     onChange={(e) => setSettings({ ...settings, storyTitleFr: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="Titre en Français..."
+                    placeholder={adminText("Titre en Français...", language)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Philosophie (EN) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Philosophie (EN) *", language)}</label>
                   <input
                     type="text"
                     required
                     value={settings.storyTitleEn || ''}
                     onChange={(e) => setSettings({ ...settings, storyTitleEn: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="Titre en Anglais..."
+                    placeholder={adminText("Titre en Anglais...", language)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description (FR) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description (FR) *", language)}</label>
                   <textarea
                     required
                     rows={3}
                     value={settings.storyDescFr || ''}
                     onChange={(e) => setSettings({ ...settings, storyDescFr: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="Description en Français..."
+                    placeholder={adminText("Description en Français...", language)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description (EN) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description (EN) *", language)}</label>
                   <textarea
                     required
                     rows={3}
                     value={settings.storyDescEn || ''}
                     onChange={(e) => setSettings({ ...settings, storyDescEn: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="Description en Anglais..."
+                    placeholder={adminText("Description en Anglais...", language)}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold font-mono">Image de la Philosophie *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block font-bold font-mono">{adminText("Image de la Philosophie *", language)}</label>
                   <input
                     type="text"
                     required
                     value={settings.storyImage || ''}
                     onChange={(e) => setSettings({ ...settings, storyImage: e.target.value })}
                     className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-3 text-white"
-                    placeholder="URL ou base64 de l'image de la philosophie..."
+                    placeholder={adminText("URL ou base64 de l'image de la philosophie...", language)}
                   />
                   <div className="flex items-center space-x-2">
                     <input
@@ -2366,51 +1648,45 @@ export default function GodDashboard() {
                         }
                       }}
                     />
-                    <label htmlFor="upload-philosophy-img" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">
-                      ⬆ Charger Fichier Image Philosophie
-                    </label>
-                    {settings.storyImage && <span className="text-[9px] text-emerald-400 font-mono">✓ Image chargée</span>}
+                    <label htmlFor="upload-philosophy-img" className="cursor-pointer px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-mono text-[9px] uppercase tracking-wider rounded border border-white/5 inline-block">{adminText("⬆ Charger Fichier Image Philosophie", language)}</label>
+                    {settings.storyImage && <span className="text-[9px] text-emerald-400 font-mono">{adminText("✓ Image chargée", language)}</span>}
                   </div>
                 </div>
               </div>
 
               {/* SECTION: HOMEPAGE SECTION 3 (PRESTIGE FABRICS) */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">
-                  SECTION 3 : ÉTOFFES NOBLES ET TISSUS D'EXCEPTION
-                </h3>
-                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">
-                  Éditez les 3 cartes de présentation de tissus (titres, descriptions et images).
-                </p>
+                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">{adminText("SECTION 3 : ÉTOFFES NOBLES ET TISSUS D'EXCEPTION", language)}</h3>
+                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">{adminText("Éditez les 3 cartes de présentation de tissus (titres, descriptions et images).", language)}</p>
               </div>
               <div className="space-y-6">
                 {/* Fabric 1 */}
                 <div className="p-4 bg-neutral-950/60 rounded border border-white/5 space-y-4">
-                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">Étoffe n°1 ("Good Luck")</h4>
+                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">{adminText("Étoffe n°1 (\"Good Luck\")", language)}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Titre FR"
+                      placeholder={adminText("Titre FR", language)}
                       value={settings.fabric1TitleFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric1TitleFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <input
                       type="text"
-                      placeholder="Titre EN"
+                      placeholder={adminText("Titre EN", language)}
                       value={settings.fabric1TitleEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric1TitleEn: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <textarea
-                      placeholder="Description FR"
+                      placeholder={adminText("Description FR", language)}
                       rows={2}
                       value={settings.fabric1DescFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric1DescFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white md:col-span-2"
                     />
                     <textarea
-                      placeholder="Description EN"
+                      placeholder={adminText("Description EN", language)}
                       rows={2}
                       value={settings.fabric1DescEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric1DescEn: e.target.value })}
@@ -2419,7 +1695,7 @@ export default function GodDashboard() {
                     <div className="md:col-span-2 space-y-2">
                       <input
                         type="text"
-                        placeholder="URL de l'image de l'étoffe 1"
+                        placeholder={adminText("URL de l'image de l'étoffe 1", language)}
                         value={settings.fabric1Image || ''}
                         onChange={(e) => setSettings({ ...settings, fabric1Image: e.target.value })}
                         className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
@@ -2434,40 +1710,38 @@ export default function GodDashboard() {
                           if (file) await handleFileUploadHelper(file, 'fabric1Image');
                         }}
                       />
-                      <label htmlFor="upload-fabric-1" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">
-                        ⬆ Charger Image Étoffe 1
-                      </label>
+                      <label htmlFor="upload-fabric-1" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">{adminText("⬆ Charger Image Étoffe 1", language)}</label>
                     </div>
                   </div>
                 </div>
 
                 {/* Fabric 2 */}
                 <div className="p-4 bg-neutral-950/60 rounded border border-white/5 space-y-4">
-                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">Étoffe n°2 ("Super Wax")</h4>
+                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">{adminText("Étoffe n°2 (\"Super Wax\")", language)}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Titre FR"
+                      placeholder={adminText("Titre FR", language)}
                       value={settings.fabric2TitleFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric2TitleFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <input
                       type="text"
-                      placeholder="Titre EN"
+                      placeholder={adminText("Titre EN", language)}
                       value={settings.fabric2TitleEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric2TitleEn: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <textarea
-                      placeholder="Description FR"
+                      placeholder={adminText("Description FR", language)}
                       rows={2}
                       value={settings.fabric2DescFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric2DescFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white md:col-span-2"
                     />
                     <textarea
-                      placeholder="Description EN"
+                      placeholder={adminText("Description EN", language)}
                       rows={2}
                       value={settings.fabric2DescEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric2DescEn: e.target.value })}
@@ -2476,7 +1750,7 @@ export default function GodDashboard() {
                     <div className="md:col-span-2 space-y-2">
                       <input
                         type="text"
-                        placeholder="URL de l'image de l'étoffe 2"
+                        placeholder={adminText("URL de l'image de l'étoffe 2", language)}
                         value={settings.fabric2Image || ''}
                         onChange={(e) => setSettings({ ...settings, fabric2Image: e.target.value })}
                         className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
@@ -2491,40 +1765,38 @@ export default function GodDashboard() {
                           if (file) await handleFileUploadHelper(file, 'fabric2Image');
                         }}
                       />
-                      <label htmlFor="upload-fabric-2" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">
-                        ⬆ Charger Image Étoffe 2
-                      </label>
+                      <label htmlFor="upload-fabric-2" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">{adminText("⬆ Charger Image Étoffe 2", language)}</label>
                     </div>
                   </div>
                 </div>
 
                 {/* Fabric 3 */}
                 <div className="p-4 bg-neutral-950/60 rounded border border-white/5 space-y-4">
-                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">Étoffe n°3 ("Brocart Royal")</h4>
+                  <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">{adminText("Étoffe n°3 (\"Brocart Royal\")", language)}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Titre FR"
+                      placeholder={adminText("Titre FR", language)}
                       value={settings.fabric3TitleFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric3TitleFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <input
                       type="text"
-                      placeholder="Titre EN"
+                      placeholder={adminText("Titre EN", language)}
                       value={settings.fabric3TitleEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric3TitleEn: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                     />
                     <textarea
-                      placeholder="Description FR"
+                      placeholder={adminText("Description FR", language)}
                       rows={2}
                       value={settings.fabric3DescFr || ''}
                       onChange={(e) => setSettings({ ...settings, fabric3DescFr: e.target.value })}
                       className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white md:col-span-2"
                     />
                     <textarea
-                      placeholder="Description EN"
+                      placeholder={adminText("Description EN", language)}
                       rows={2}
                       value={settings.fabric3DescEn || ''}
                       onChange={(e) => setSettings({ ...settings, fabric3DescEn: e.target.value })}
@@ -2533,7 +1805,7 @@ export default function GodDashboard() {
                     <div className="md:col-span-2 space-y-2">
                       <input
                         type="text"
-                        placeholder="URL de l'image de l'étoffe 3"
+                        placeholder={adminText("URL de l'image de l'étoffe 3", language)}
                         value={settings.fabric3Image || ''}
                         onChange={(e) => setSettings({ ...settings, fabric3Image: e.target.value })}
                         className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
@@ -2548,9 +1820,7 @@ export default function GodDashboard() {
                           if (file) await handleFileUploadHelper(file, 'fabric3Image');
                         }}
                       />
-                      <label htmlFor="upload-fabric-3" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">
-                        ⬆ Charger Image Étoffe 3
-                      </label>
+                      <label htmlFor="upload-fabric-3" className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">{adminText("⬆ Charger Image Étoffe 3", language)}</label>
                     </div>
                   </div>
                 </div>
@@ -2558,12 +1828,8 @@ export default function GodDashboard() {
 
               {/* SECTION: HOMEPAGE SECTION 4 (BENTO SALONS DE PRESTIGE) */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">
-                  SECTION 4 : LES 4 SALONS DE PRESTIGE (GRILLE BENTO)
-                </h3>
-                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">
-                  Éditez les 4 zones interactives de la grille Bento (Horlogerie, Maillons d'Or, Mocassins, Costumes).
-                </p>
+                <h3 className="text-xs font-semibold text-amber-500 uppercase tracking-widest">{adminText("SECTION 4 : LES 4 SALONS DE PRESTIGE (GRILLE BENTO)", language)}</h3>
+                <p className="text-[9px] text-neutral-500 uppercase mt-0.5 font-mono">{adminText("Éditez les 4 zones interactives de la grille Bento (Horlogerie, Maillons d'Or, Mocassins, Costumes).", language)}</p>
               </div>
               <div className="space-y-6">
                 {[1, 2, 3, 4].map((num) => {
@@ -2575,31 +1841,31 @@ export default function GodDashboard() {
 
                   return (
                     <div key={num} className="p-4 bg-neutral-950/60 rounded border border-white/5 space-y-4">
-                      <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">Salon Bento n°{num}</h4>
+                      <h4 className="text-[11px] font-mono text-white tracking-widest uppercase">{adminText("Salon Bento n°", language)}{num}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input
                           type="text"
-                          placeholder="Titre FR"
+                          placeholder={adminText("Titre FR", language)}
                           value={(settings[titleFrKey] as string) || ''}
                           onChange={(e) => setSettings({ ...settings, [titleFrKey]: e.target.value })}
                           className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                         />
                         <input
                           type="text"
-                          placeholder="Titre EN"
+                          placeholder={adminText("Titre EN", language)}
                           value={(settings[titleEnKey] as string) || ''}
                           onChange={(e) => setSettings({ ...settings, [titleEnKey]: e.target.value })}
                           className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white"
                         />
                         <textarea
-                          placeholder="Description FR"
+                          placeholder={adminText("Description FR", language)}
                           rows={2}
                           value={(settings[descFrKey] as string) || ''}
                           onChange={(e) => setSettings({ ...settings, [descFrKey]: e.target.value })}
                           className="w-full bg-neutral-900 border border-white/10 text-xs px-3.5 py-2 text-white md:col-span-2"
                         />
                         <textarea
-                          placeholder="Description EN"
+                          placeholder={adminText("Description EN", language)}
                           rows={2}
                           value={(settings[descEnKey] as string) || ''}
                           onChange={(e) => setSettings({ ...settings, [descEnKey]: e.target.value })}
@@ -2623,8 +1889,7 @@ export default function GodDashboard() {
                               if (file) await handleFileUploadHelper(file, imgKey);
                             }}
                           />
-                          <label htmlFor={`upload-bento-${num}`} className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">
-                            ⬆ Charger Image Bento {num}
+                          <label htmlFor={`upload-bento-${num}`} className="cursor-pointer px-3 py-1 bg-neutral-800 text-amber-500 text-[9px] font-mono uppercase rounded border border-white/5 inline-block">{adminText("⬆ Charger Image Bento", language)}{num}
                           </label>
                         </div>
                       </div>
@@ -2635,13 +1900,11 @@ export default function GodDashboard() {
 
               {/* SECTION: PAGE À PROPOS */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-widest">
-                  CONTENU DE LA PAGE À PROPOS
-                </h3>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-widest">{adminText("CONTENU DE LA PAGE À PROPOS", language)}</h3>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre À Propos (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre À Propos (Français) *", language)}</label>
                   <input
                     id="sett-about-title-fr"
                     type="text"
@@ -2652,7 +1915,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre À Propos (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre À Propos (Anglais) *", language)}</label>
                   <input
                     id="sett-about-title-en"
                     type="text"
@@ -2665,7 +1928,7 @@ export default function GodDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Texte Manifeste À Propos (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Texte Manifeste À Propos (Français) *", language)}</label>
                   <textarea
                     id="sett-about-content-fr"
                     required
@@ -2676,7 +1939,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Texte Manifeste À Propos (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Texte Manifeste À Propos (Anglais) *", language)}</label>
                   <textarea
                     id="sett-about-content-en"
                     required
@@ -2690,13 +1953,11 @@ export default function GodDashboard() {
 
               {/* SECTION: PAGE CONTACT */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-widest">
-                  CONTENU DE LA PAGE CONTACT
-                </h3>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-widest">{adminText("CONTENU DE LA PAGE CONTACT", language)}</h3>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Contact (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Contact (Français) *", language)}</label>
                   <input
                     id="sett-contact-title-fr"
                     type="text"
@@ -2707,7 +1968,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Contact (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Contact (Anglais) *", language)}</label>
                   <input
                     id="sett-contact-title-en"
                     type="text"
@@ -2720,7 +1981,7 @@ export default function GodDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Adresse Physique (Français) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Adresse Physique (Français) *", language)}</label>
                   <input
                     id="sett-contact-addr-fr"
                     type="text"
@@ -2731,7 +1992,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Adresse Physique (Anglais) *</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Adresse Physique (Anglais) *", language)}</label>
                   <input
                     id="sett-contact-addr-en"
                     type="text"
@@ -2743,7 +2004,7 @@ export default function GodDashboard() {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien URL d'Intégration Google Map (Iframe Src) *</label>
+                <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Lien URL d'Intégration Google Map (Iframe Src) *", language)}</label>
                 <input
                   id="sett-map-url"
                   type="text"
@@ -2757,13 +2018,11 @@ export default function GodDashboard() {
 
               {/* SECTION: PAGE ATELIER CARE */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-amber-500">
-                  CONTENU DE LA PAGE ATELIER CARE (SOUVERAINETÉ CLIENT)
-                </h3>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-amber-500">{adminText("CONTENU DE LA PAGE ATELIER CARE (SOUVERAINETÉ CLIENT)", language)}</h3>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Atelier Care (Français)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Atelier Care (Français)", language)}</label>
                   <input
                     id="sett-care-title-fr"
                     type="text"
@@ -2773,7 +2032,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Titre Atelier Care (Anglais)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Titre Atelier Care (Anglais)", language)}</label>
                   <input
                     id="sett-care-title-en"
                     type="text"
@@ -2785,7 +2044,7 @@ export default function GodDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Contenu / Description Care (Français)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Contenu / Description Care (Français)", language)}</label>
                   <textarea
                     id="sett-care-content-fr"
                     rows={3}
@@ -2795,7 +2054,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Contenu / Description Care (Anglais)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Contenu / Description Care (Anglais)", language)}</label>
                   <textarea
                     id="sett-care-content-en"
                     rows={3}
@@ -2809,7 +2068,7 @@ export default function GodDashboard() {
               {/* INTERACTIVE FAQ EDITOR SECTION */}
               <div className="border-b border-white/5 pb-2 pt-4">
                 <h3 className="text-sm font-semibold text-white uppercase tracking-widest text-amber-500 flex justify-between items-center bg-amber-500/10 p-3 rounded">
-                  <span>FAQ - QUESTIONS FREQUENTES D'ATELIER CARE</span>
+                  <span>{adminText("FAQ - QUESTIONS FREQUENTES D'ATELIER CARE", language)}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -2825,9 +2084,7 @@ export default function GodDashboard() {
                       setSettings({ ...settings, faqsJson: JSON.stringify(updated) });
                     }}
                     className="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-black font-mono text-[9px] font-bold rounded cursor-pointer duration-200 uppercase tracking-widest"
-                  >
-                    + Ajouter une FAQ
-                  </button>
+                  >{adminText("+ Ajouter une FAQ", language)}</button>
                 </h3>
               </div>
 
@@ -2840,9 +2097,7 @@ export default function GodDashboard() {
                   
                   if (!Array.isArray(fList) || fList.length === 0) {
                     return (
-                      <div className="py-4 text-center border border-dashed border-white/10 text-xs text-neutral-500 uppercase font-mono tracking-wider">
-                        Aucune Question Fréquente définie.
-                      </div>
+                      <div className="py-4 text-center border border-dashed border-white/10 text-xs text-neutral-500 uppercase font-mono tracking-wider">{adminText("Aucune Question Fréquente définie.", language)}</div>
                     );
                   }
 
@@ -2856,15 +2111,13 @@ export default function GodDashboard() {
                             setSettings({ ...settings, faqsJson: JSON.stringify(updated) });
                           }}
                           className="p-1.5 px-3 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded text-[9px] font-mono uppercase tracking-widest duration-300 cursor-pointer"
-                        >
-                          Supprimer
-                        </button>
+                        >{adminText("Supprimer", language)}</button>
                       </div>
                       <span className="text-[9px] font-mono text-amber-400 uppercase">SBMJ FAQ #{fIdx + 1}</span>
                       
                       <div className="grid grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">Question (Français)</label>
+                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">{adminText("Question (Français)", language)}</label>
                           <input
                             type="text"
                             value={faq.q || faq.qFr || ''}
@@ -2877,7 +2130,7 @@ export default function GodDashboard() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">Question (Anglais)</label>
+                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">{adminText("Question (Anglais)", language)}</label>
                           <input
                             type="text"
                             value={faq.qEn || ''}
@@ -2893,7 +2146,7 @@ export default function GodDashboard() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">Réponse (Français)</label>
+                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">{adminText("Réponse (Français)", language)}</label>
                           <textarea
                             rows={2}
                             value={faq.a || faq.aFr || ''}
@@ -2906,7 +2159,7 @@ export default function GodDashboard() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">Réponse (Anglais)</label>
+                          <label className="text-[9px] font-mono text-neutral-500 uppercase block">{adminText("Réponse (Anglais)", language)}</label>
                           <textarea
                             rows={2}
                             value={faq.aEn || ''}
@@ -2926,13 +2179,11 @@ export default function GodDashboard() {
 
               {/* SECTION: FOOTER DE LA MAISON */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-amber-500">
-                  CONTENU DU FOOTER DE LA MAISON
-                </h3>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-amber-500">{adminText("CONTENU DU FOOTER DE LA MAISON", language)}</h3>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description Footer (Français)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description Footer (Français)", language)}</label>
                   <textarea
                     id="sett-footer-text-fr"
                     rows={2}
@@ -2942,7 +2193,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Description Footer (Anglais)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Description Footer (Anglais)", language)}</label>
                   <textarea
                     id="sett-footer-text-en"
                     rows={2}
@@ -2954,7 +2205,7 @@ export default function GodDashboard() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Crédits Footer (Français)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Crédits Footer (Français)", language)}</label>
                   <input
                     id="sett-footer-credits-fr"
                     type="text"
@@ -2964,7 +2215,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Crédits Footer (Anglais)</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Crédits Footer (Anglais)", language)}</label>
                   <input
                     id="sett-footer-credits-en"
                     type="text"
@@ -2977,7 +2228,7 @@ export default function GodDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien Instagram Footer</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Lien Instagram Footer", language)}</label>
                   <input
                     id="sett-instagram-url"
                     type="url"
@@ -2988,7 +2239,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien Facebook Footer</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Lien Facebook Footer", language)}</label>
                   <input
                     id="sett-facebook-url"
                     type="url"
@@ -2999,7 +2250,7 @@ export default function GodDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">Lien WhatsApp Footer</label>
+                  <label className="text-[10px] font-mono text-neutral-500 uppercase block">{adminText("Lien WhatsApp Footer", language)}</label>
                   <input
                     id="sett-whatsapp-url"
                     type="url"
@@ -3013,12 +2264,10 @@ export default function GodDashboard() {
 
               {/* SECTION: SECURITE SOUVERAINETÉ */}
               <div className="border-b border-white/5 pb-2 pt-4">
-                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-red-500">
-                  SÉCURITÉ ET ACCÈS SOUVERAIN (ADMIN)
-                </h3>
+                <h3 className="text-xs font-semibold text-white uppercase tracking-widest text-red-500">{adminText("SÉCURITÉ ET ACCÈS SOUVERAIN (ADMIN)", language)}</h3>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-red-400 uppercase block">Nouveau Mot de Passe d'Accès Administratif *</label>
+                <label className="text-[10px] font-mono text-red-400 uppercase block">{adminText("Nouveau Mot de Passe d'Accès Administratif *", language)}</label>
                 <button type="button" onClick={async () => {
                   try { await logout(); setIsAdminRecoverMode(true); }
                   catch (error: any) { alert(error.message); }
@@ -3031,9 +2280,7 @@ export default function GodDashboard() {
                 id="btn-save-settings"
                 type="submit"
                 className="px-6 h-11 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold rounded cursor-pointer duration-300"
-              >
-                METTRE À JOUR LA CONFIRMATION
-              </button>
+              >{adminText("METTRE À JOUR LA CONFIRMATION", language)}</button>
 
             </form>
           )}
@@ -3048,23 +2295,16 @@ export default function GodDashboard() {
                 <div>
                   <div className="flex items-center space-x-2 text-emerald-500">
                     <MessageSquare className="w-5 h-5 animate-pulse" />
-                    <h3 className="text-sm font-semibold uppercase tracking-widest text-[#10b981]">
-                      MODÉRATION DES AVIS CLIENTÈLE
-                    </h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-widest text-[#10b981]">{adminText("MODÉRATION DES AVIS CLIENTÈLE", language)}</h3>
                   </div>
-                  <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                    Examinez, approuvez ou rejetez les témoignages soumis par vos clients d'exception.
-                  </p>
+                  <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">{adminText("Examinez, approuvez ou rejetez les témoignages soumis par vos clients d'exception.", language)}</p>
                 </div>
                 <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded text-emerald-400 font-mono text-xs">
-                  {reviewsList.filter(r => r.status === 'pending').length} EN ATTENTE
-                </div>
+                  {reviewsList.filter(r => r.status === 'pending').length}{adminText("EN ATTENTE", language)}</div>
               </div>
 
               {reviewsList.length === 0 ? (
-                <div className="py-12 border border-dashed border-white/10 rounded-lg text-center text-neutral-500 text-xs uppercase font-mono tracking-widest">
-                  Aucun avis n'est actuellement enregistré dans la base de données.
-                </div>
+                <div className="py-12 border border-dashed border-white/10 rounded-lg text-center text-neutral-500 text-xs uppercase font-mono tracking-widest">{adminText("Aucun avis n'est actuellement enregistré dans la base de données.", language)}</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
                   {reviewsList.map((rev) => (
@@ -3126,9 +2366,7 @@ export default function GodDashboard() {
                               }
                             }}
                             className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[10px] uppercase font-bold tracking-wider rounded cursor-pointer duration-300 text-center"
-                          >
-                            Approuver & Publier ⚜_
-                          </button>
+                          >{adminText("Approuver & Publier ⚜_", language)}</button>
                         )}
                         <button
                           type="button"
@@ -3169,9 +2407,7 @@ export default function GodDashboard() {
                 <button
                   onClick={() => setSelectedOrderForInvoice(null)}
                   className="absolute top-4 right-4 z-10 p-2 px-3 bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white rounded font-mono font-bold text-[10px] uppercase cursor-pointer"
-                >
-                  ✕ Fermer la facture
-                </button>
+                >{adminText("✕ Fermer la facture", language)}</button>
 
                 <InvoicePreview order={selectedOrderForInvoice} language={language} onReady={setAdminInvoiceFile} />
 
@@ -3191,7 +2427,7 @@ export default function GodDashboard() {
                     }}
                     className="px-6 h-12 bg-amber-400 text-black hover:bg-amber-300 rounded text-xs font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
                   >
-                    <span>💬 RELANCER LE CLIENT SUR WHATSAPP</span>
+                    <span>{adminText("💬 RELANCER LE CLIENT SUR WHATSAPP", language)}</span>
                   </button>
                 </div>
 

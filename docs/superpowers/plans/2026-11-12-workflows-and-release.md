@@ -23,3 +23,15 @@
 
 ## Verification
 Write failing handler/transaction tests first. Cover role/ownership, malformed payloads, unapproved drivers, illegal transitions, duplicate/replayed requests, stock conflicts and signed receipt immutability. Run the project test command, TypeScript, production build and focused/full browser workflows. Test migrations in a rolled-back transaction before applying a coordinated release. Record commands/results and external dependencies below as work progresses.
+
+## Progress
+
+- [x] Implemented delivery/payment/stock/signature ownership and replay guards; SQL transaction tests passed and additive workflow migration applied without deleting business records.
+- [x] Added actual private inbox/section counts, session-bound push subscriptions and public-only PWA caches. Real device acceptance and off-site retry scheduling remain separate open items.
+- [x] Added cash journal pagination, expense comparisons, paid-purchase VIP ranking, searchable security archives and server-side email/manual WhatsApp outreach.
+- [x] Owner confirmed receiving both authorized email checks, including the real outreach-handler test. No fictitious mailbox or campaign was used.
+- [x] Merged the incoming owner changes; verified encrypted public-table restoration and applied the five release migrations. Catalogue media reference changed only after original-byte verification.
+- [x] Reproduced direct-entry native back leaving the app; implemented finite predecessor history and history-aware transient windows. Full desktop/mobile browser suite passed all 54 tests, including PDF equality, account retention and footer navigation.
+- [ ] Complete final browser/PDF and preview smoke checks, correct-repository push, production verification, credential retirement and the release evidence close-out.
+
+See `docs/operations/2026-11-12-release-progress.md` for actual evidence and remaining external setup. The unchecked work-package items above intentionally remain open until their acceptance/release requirements are satisfied.

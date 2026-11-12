@@ -29,6 +29,35 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('native back after direct product entry follows shop then home and retains the verified session', async ({ page, isMobile }) => {
+  await page.goto('/produit/navigation-watch', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#btn-back-to-boutique')).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL('/boutique');
+  await expect(page.locator('#product-card-navigation-watch')).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL('/');
+  if (isMobile) {
+    await page.locator('#btn-mobile-menu-toggle').click();
+    await expect(page.getByText(client.name, { exact: true }).last()).toBeVisible();
+    await page.locator('#btn-mobile-menu-toggle').click();
+  } else await expect(page.getByRole('button', { name: client.name, exact: true }).first()).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL('/');
+});
+
+test('native back closes an account dialog before leaving the page', async ({ page, isMobile }) => {
+  await page.goto('/contact', { waitUntil: 'domcontentloaded' });
+  if (isMobile) await page.locator('#btn-mobile-menu-toggle').click();
+  else await page.locator('#btn-header-profile').hover();
+  await page.getByRole('button', { name: /MODIFIER.*PASSE/i }).filter({ visible: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await page.goBack();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL('/contact');
+});
+
 test('back and forward visit each page without losing the verified client', async ({ page, isMobile }, testInfo) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await dismissIntro(page);

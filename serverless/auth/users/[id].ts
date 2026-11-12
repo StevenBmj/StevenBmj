@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { clearSession, requireUser } from '../../../src/server/security';
+import { clearSession, requireUser } from '../../../src/server/security.js';
 
 function json(res: any, status: number, body: any) {
   res.status(status).setHeader('content-type', 'application/json');

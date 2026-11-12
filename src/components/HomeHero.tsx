@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -59,7 +60,7 @@ function TypewriterTitle() {
 }
 
 function HeroBackground() {
-  const { settings } = useApp();
+  const { settings, language } = useApp();
   const defaultImages = [
     "https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=1600&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=1600&auto=format&fit=crop",
@@ -118,7 +119,7 @@ function HeroBackground() {
           <motion.img
             key={index}
             src={img.src}
-            alt="StevenBmj Majestic Background"
+            alt={localizedText("StevenBmj Majestic Background", language)}
             className="absolute inset-0 w-full h-full object-cover filter brightness-[0.35]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, ...img.animate }}
@@ -211,7 +212,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
 
         {/* Scroll down indicator line */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center space-y-2 z-10 opacity-70">
-          <span className="text-[8px] font-mono tracking-[0.3em] uppercase text-neutral-400">SCROLL DE PRESTIGE</span>
+          <span className="text-[8px] font-mono tracking-[0.3em] uppercase text-neutral-400">{localizedText("SCROLL DE PRESTIGE", language)}</span>
           <div className="h-12 w-[1.5px] bg-gradient-to-b from-amber-400 to-transparent animate-pulse" />
         </div>
       </section>
@@ -230,7 +231,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           >
             <img
               src={settings?.storyImage || "https://images.unsplash.com/photo-1551537482-f2075a1d41f2?q=80&w=600&auto=format&fit=crop"}
-              alt="Tailoring Creation SBMJ"
+              alt={localizedText("Tailoring Creation SBMJ", language)}
               className="w-full h-full object-cover filter brightness-[0.75] contrast-[1.05]"
             />
             <div className="absolute inset-0 bg-neutral-950/20" />
@@ -254,7 +255,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
             className="space-y-8 text-left"
           >
-            <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block">NOTRE PHILOSOPHIE</span>
+            <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block">{localizedText("NOTRE PHILOSOPHIE", language)}</span>
             <h2 className="text-3xl sm:text-4xl font-extralight text-white uppercase tracking-wider leading-snug">
               {language === 'FR' 
                 ? (settings?.storyTitleFr || "L'élégance masculine, pensée comme une expérience complète") 
@@ -268,12 +269,12 @@ export default function HomeHero({ setView }: HomeHeroProps) {
 
             <div className="grid grid-cols-2 gap-8 pt-6 border-t border-white/5 font-mono">
               <div className="space-y-1">
-                <span className="text-sm font-bold text-white block">COTONOU • BÉNIN</span>
-                <span className="text-[10px] text-neutral-500 uppercase">ANCRAGE & DÉVELOPPEMENT</span>
+                <span className="text-sm font-bold text-white block">{localizedText("COTONOU • BÉNIN", language)}</span>
+                <span className="text-[10px] text-neutral-500 uppercase">{localizedText("ANCRAGE & DÉVELOPPEMENT", language)}</span>
               </div>
               <div className="space-y-1">
-                <span className="text-sm font-bold text-white block">AFRIQUE DE L'OUEST</span>
-                <span className="text-[10px] text-neutral-500 uppercase">VISION D'EXPANSION</span>
+                <span className="text-sm font-bold text-white block">{localizedText("AFRIQUE DE L'OUEST", language)}</span>
+                <span className="text-[10px] text-neutral-500 uppercase">{localizedText("VISION D'EXPANSION", language)}</span>
               </div>
             </div>
           </motion.div>
@@ -316,7 +317,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <div className="absolute inset-0 z-0">
               <img 
                 src={settings?.fabric1Image || "https://images.unsplash.com/photo-1584917865442-de89df76afd3?q=80&w=600&auto=format&fit=crop"} 
-                alt="Tissu de Prestige Good Luck" 
+                alt={localizedText("Tissu de Prestige Good Luck", language)}
                 className="w-full h-full object-cover filter brightness-[0.55] group-hover:scale-105 duration-700 transition-transform" 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -355,7 +356,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <div className="absolute inset-0 z-0">
               <img 
                 src={settings?.fabric2Image || "https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=600&auto=format&fit=crop"} 
-                alt="Waxes Vlisco Authentique" 
+                alt={localizedText("Waxes Vlisco Authentique", language)}
                 className="w-full h-full object-cover filter brightness-[0.55] group-hover:scale-105 duration-700 transition-transform" 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -394,7 +395,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
             <div className="absolute inset-0 z-0">
               <img 
                 src={settings?.fabric3Image || "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?q=80&w=600&auto=format&fit=crop"} 
-                alt="Brocart de Soie Suisse" 
+                alt={localizedText("Brocart de Soie Suisse", language)}
                 className="w-full h-full object-cover filter brightness-[0.55] group-hover:scale-105 duration-700 transition-transform" 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -453,7 +454,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           >
             <img
               src={settings?.bento1Image || "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600&auto=format&fit=crop"}
-              alt="Swiss Prestige Calibres"
+              alt={localizedText("Swiss Prestige Calibres", language)}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-103 filter contrast-[1.05] brightness-75 group-hover:brightness-95"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-8 text-left">
@@ -480,7 +481,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           >
             <img
               src={settings?.bento2Image || "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=600&auto=format&fit=crop"}
-              alt="Chains and Jewelry"
+              alt={localizedText("Chains and Jewelry", language)}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-103 filter contrast-[1.05] brightness-75 group-hover:brightness-95"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-8 text-left">
@@ -507,7 +508,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           >
             <img
               src={settings?.bento3Image || "https://images.unsplash.com/photo-1533867617858-e7b97e060509?q=80&w=600&auto=format&fit=crop"}
-              alt="Crepe shoe models"
+              alt={localizedText("Crepe shoe models", language)}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-103 filter contrast-[1.05] brightness-75"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-8 text-left">
@@ -534,7 +535,7 @@ export default function HomeHero({ setView }: HomeHeroProps) {
           >
             <img
               src={settings?.bento4Image || "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?q=80&w=600&auto=format&fit=crop"}
-              alt="Elite Suits Tailoring"
+              alt={localizedText("Elite Suits Tailoring", language)}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-103 filter contrast-[1.05] brightness-75 group-hover:brightness-95"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-8 text-left">

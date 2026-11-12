@@ -27,6 +27,7 @@ export default function LedgerReports() {
   const money = (minor: number, currency: string) => new Intl.NumberFormat(fr ? 'fr-FR' : 'en-GB', { style: 'currency', currency }).format(minor / (currency === 'XOF' ? 1 : 100));
   const labels: Record<string, string> = fr ? { inventory: 'Achats de stock', delivery: 'Livraison', fees: 'Frais', rent: 'Loyer', tax: 'Taxes', other: 'Autre' } : { inventory: 'Inventory purchases', delivery: 'Delivery', fees: 'Fees', rent: 'Rent', tax: 'Taxes', other: 'Other' };
   useEffect(() => {
+    setData(null); setLoading(false); setError(''); setPage(0);
     if (filter === 'custom' && (!dates.from || !dates.to) || compare && (!dates.compareFrom || !dates.compareTo)) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ resource: 'ledger', ...(filter === 'custom' ? { from: dates.from, to: dates.to } : { filter }) });

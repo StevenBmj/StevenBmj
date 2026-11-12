@@ -1,4 +1,4 @@
-import { adminClient, authRateLimit, readJson, reply, setSession, userView } from '../../src/server/security';
+import { adminClient, authRateLimit, readJson, reply, setSession, userView, sessionProfile } from '../../src/server/security.js';
 
 export default async function handler(req: any, res: any) {
   try {
@@ -18,7 +18,7 @@ export default async function handler(req: any, res: any) {
       expiresInSeconds: Math.max(0, Math.min(300, Math.ceil((Date.parse(profile.data.activation_expires_at || '') - Date.now()) / 1000) || 0)),
       message: 'Activez votre compte avec le code recu par e-mail.' });
     await setSession(req, res, auth.data.session);
-    return reply(res, 200, { success: true, user: userView(profile.data) });
+    return reply(res, 200, { success: true, user: userView(sessionProfile(profile.data, auth.data.user, auth.data.session.access_token)) });
   } catch {
     return reply(res, 503, { error: 'Connexion temporairement indisponible. Reessayez.' });
   }

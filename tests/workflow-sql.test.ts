@@ -61,6 +61,7 @@ test('payment, assignment, signature and confirmation are atomic, private and re
   const paid = await action(admin, 'workflow-own', 'record_payment', 0, { reference: 'bank-test', amountMinor: 10000, currency: 'EUR', method: 'bank' }, paymentId);
   assert.equal(paid.fulfilment_status, 'preparing');
   await action(admin, 'workflow-own', 'record_payment', 0, { reference: 'bank-test', amountMinor: 10000, currency: 'EUR', method: 'bank' }, paymentId);
+  await assert.rejects(action(admin, 'workflow-own', 'record_payment', 0, { reference: 'different-payment', amountMinor: 10000, currency: 'EUR', method: 'bank' }, paymentId), /request_conflict/);
   assert.equal((await db.query('select * from payment_events')).rows.length, 1);
   const second = await action(admin, 'workflow-other', 'record_payment', 0, { reference: 'bank-other', amountMinor: 10000, currency: 'EUR', method: 'bank' });
   assert.equal(second.fulfilment_status, 'stock_issue');

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, LoaderCircle, RefreshCw } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
+import { downloadCsv, downloadReportPdf } from '../lib/reportExport';
 import type { salesReport } from '../server/reports';
 
 type Report = ReturnType<typeof salesReport>;
@@ -17,8 +18,10 @@ export default function SalesReports() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const field = 'block w-full mt-1 bg-neutral-950 rounded border border-white/15 px-3 min-h-11 text-sm text-white';
   useEffect(() => {
+    setReport(null); setLoading(false); setError(false);
     if (filter === 'custom' && (!dates.from || !dates.to)) return;
     if (customCompare && (!dates.compareFrom || !dates.compareTo)) return;
     const controller = new AbortController();
@@ -37,24 +40,27 @@ export default function SalesReports() {
 
   const money = (cents: number, currency: string) => currency === 'UNKNOWN' ? `${(cents / 100).toFixed(2)} (?)`
     : new Intl.NumberFormat(fr ? 'fr-FR' : 'en-US', { style: 'currency', currency }).format(cents / 100);
-  function exportCsv() {
-    if (!report || loading || error) return;
+  async function exportReport(pdf = false) {
+    if (!report || loading || error || exporting) return;
+    setExporting(true);
+    try {
     const rows: (string | number)[][] = [['period', 'from', 'to', 'currency', 'orders', 'cancelled', 'ordered', 'paid', 'pending', 'refunded', 'unknown']];
     for (const [name, period] of Object.entries({ current: report.current, previous: report.previous })) {
       for (const value of period.totals) rows.push([name, period.from, period.to, value.currency, value.orders, value.cancelled,
         value.orderedCents / 100, value.paidCents / 100, value.pendingCents / 100, value.refundedCents / 100, value.unknownCents / 100]);
     }
-    const csv = '\ufeff' + rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = `stevenbmj-ventes-${report.current.from}-${report.current.to}.csv`; link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const name = `stevenbmj-ventes-${report.current.from}-${report.current.to}`;
+    if (pdf) await downloadReportPdf(fr ? 'Rapport des ventes' : 'Sales report', `${report.current.from} - ${report.current.to} · ${report.timeZone}`, rows[0].map(String), rows.slice(1), `${name}.pdf`);
+    else downloadCsv(rows, `${name}.csv`);
+    } catch { setError(true); } finally { setExporting(false); }
   }
   return <section className="space-y-6 min-w-0" aria-label={fr ? 'Rapports des ventes' : 'Sales reports'}>
     <div className="flex flex-wrap justify-between items-center gap-3 border-b border-white/10 pb-4">
       <h2 className="text-xl font-medium text-white">{fr ? 'Rapports des ventes' : 'Sales reports'}</h2>
       <div className="flex gap-2">
         <button type="button" onClick={() => setAttempt(value => value + 1)} aria-label={fr ? 'Actualiser les rapports' : 'Refresh reports'} title={fr ? 'Actualiser' : 'Refresh'} className="h-11 w-11 rounded border border-white/15 flex items-center justify-center"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
-        <button type="button" onClick={exportCsv} disabled={!report || loading || error} className="min-h-11 rounded border border-white/15 px-3 flex items-center gap-2 text-sm disabled:opacity-40"><Download className="w-4 h-4" />CSV</button>
+        <button type="button" onClick={() => void exportReport()} disabled={!report || loading || error || exporting} className="min-h-11 rounded border border-white/15 px-3 flex items-center gap-2 text-sm disabled:opacity-40"><Download className="w-4 h-4" />CSV</button>
+        <button type="button" onClick={() => void exportReport(true)} disabled={!report || loading || error || exporting} className="min-h-11 rounded border border-white/15 px-3 flex items-center gap-2 text-sm disabled:opacity-40"><Download className="w-4 h-4" />PDF</button>
       </div>
     </div>
     <div className="flex flex-wrap gap-4 items-end">

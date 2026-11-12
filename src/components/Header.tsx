@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,7 +9,8 @@ import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
 import NotificationBell from './NotificationBell';
-import { ShoppingBag, Heart, ShieldAlert, Languages, Coins, Menu, X, Landmark, User, LogOut, Key, Trash2 } from 'lucide-react';
+import AccountDialog from './AccountDialog';
+import { ShoppingBag, Heart, ShieldAlert, Languages, Coins, Menu, X, Landmark, User, LogOut, Key, Trash2, Eye, EyeOff } from 'lucide-react';
 
 interface HeaderProps {
   currentView: string;
@@ -40,6 +42,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
   const [isClientChangePasswordOpen, setIsClientChangePasswordOpen] = useState(false);
   const [clientSecurityCode, setClientSecurityCode] = useState('');
   const [clientNewPassword, setClientNewPassword] = useState('');
+  const [showClientPassword, setShowClientPassword] = useState(false);
   const [clientPasswordError, setClientPasswordError] = useState('');
   const [clientPasswordSuccess, setClientPasswordSuccess] = useState('');
   const [clientPasswordLoading, setClientPasswordLoading] = useState(false);
@@ -225,7 +228,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           <Logo size={42} className="shrink-0" id="header-brand-logo" />
           <div className="header-brand-wordmark flex flex-col text-left min-w-0">
             <span className="text-xl font-light tracking-[0.25em] text-white uppercase font-sans">StevenBmj</span>
-            <span className="text-[7px] font-mono tracking-[0.4em] text-amber-500 -mt-1 uppercase">Haute Joaillerie</span>
+            <span className="text-[7px] font-mono tracking-[0.4em] text-amber-500 -mt-1 uppercase">{localizedText("Haute Joaillerie", language)}</span>
           </div>
         </div>
 
@@ -323,9 +326,9 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
                   <button
                     id="btn-nav-logout"
-                    onClick={() => {
+                    onClick={async () => {
                       const wasAdmin = user?.isAdmin;
-                      logout();
+                      try { await logout(); } catch { alert(language === 'FR' ? 'Déconnexion impossible. Réessayez.' : 'Unable to sign out. Please retry.'); return; }
                       if (wasAdmin) {
                         setView('god');
                       } else {
@@ -485,9 +488,9 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                   )}
 
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const wasAdmin = user?.isAdmin;
-                      logout();
+                      try { await logout(); } catch { alert(language === 'FR' ? 'Déconnexion impossible. Réessayez.' : 'Unable to sign out. Please retry.'); return; }
                       setMobileMenuOpen(false);
                       if (wasAdmin) {
                         setView('god');
@@ -521,7 +524,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                 className="flex items-center justify-center space-x-2 p-2.5 w-full bg-neutral-900 border border-white/10 rounded cursor-pointer duration-300 text-neutral-300 text-xs font-mono"
               >
                 <Coins className="w-4 h-4 text-amber-500" />
-                <span>{language === 'FR' ? 'DEVISE' : 'CURRENCY'}: <strong className="text-white font-bold">{currency}</strong></span>
+                <span>{language === 'FR' ? 'DEVISE' : 'CURRENCY'}: <strong className="text-white font-bold">{currency === 'USD' && !exchangeInfo.usd ? 'EUR' : currency}</strong></span>
               </button>
 
               <button
@@ -538,11 +541,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
       {/* Client Change Password Modal */}
       {isClientChangePasswordOpen && (
-        <div className="fixed inset-0 z-[10000] grid place-items-center p-4">
-          <div 
-            onClick={() => setIsClientChangePasswordOpen(false)}
-            className="absolute inset-0 bg-black/85 backdrop-blur-md cursor-pointer"
-          />
+        <AccountDialog label={language === 'FR' ? 'Modifier le mot de passe' : 'Change password'} close={() => setIsClientChangePasswordOpen(false)}>
           <div className="relative bg-neutral-950 border border-white/10 w-full max-w-sm rounded-lg p-6 shadow-2xl z-[10001] overflow-y-auto max-h-[92vh]">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-amber-600 via-amber-400 to-amber-700" />
             
@@ -554,7 +553,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             </button>
 
             <div className="text-center mb-5">
-              <span className="text-[8px] font-mono tracking-[0.3em] text-amber-500 uppercase font-bold block mb-1">PRIVILEGE SBMJ SECURITY</span>
+              <span className="text-[8px] font-mono tracking-[0.3em] text-amber-500 uppercase font-bold block mb-1">{localizedText("PRIVILEGE SBMJ SECURITY", language)}</span>
               <h3 className="text-base font-light text-white uppercase tracking-widest">{language === 'FR' ? "Nouveau Mot de Passe" : "Update Password"}</h3>
             </div>
 
@@ -601,14 +600,18 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
               <div className="space-y-1">
                 <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">{language === 'FR' ? "Nouveau Mot de Passe *" : "New Password *"}</label>
-                <input
-                  type="password"
+                <div className="relative"><input
+                  aria-label={language === 'FR' ? 'Nouveau mot de passe' : 'New password'}
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={1024}
+                  type={showClientPassword ? 'text' : 'password'}
                   required
                   value={clientNewPassword}
                   onChange={(e) => setClientNewPassword(e.target.value)}
-                  className="w-full bg-neutral-900 border border-white/10 text-xs px-3 py-2.5 text-white rounded font-mono focus:border-amber-400 focus:outline-none"
+                  className="min-h-11 w-full bg-neutral-900 border border-white/10 text-base pl-3 pr-12 py-2.5 text-white rounded focus:border-amber-400 focus:outline-none"
                   placeholder="••••••••"
-                />
+                /><button type="button" onClick={() => setShowClientPassword(value => !value)} aria-label={showClientPassword ? (language === 'FR' ? 'Masquer le mot de passe' : 'Hide password') : (language === 'FR' ? 'Afficher le mot de passe' : 'Show password')} title={language === 'FR' ? 'Visibilité du mot de passe' : 'Password visibility'} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-neutral-400">{showClientPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
               </div>
 
               <button
@@ -624,11 +627,11 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
               </button>
             </form>
           </div>
-        </div>
+        </AccountDialog>
       )}
 
       {isDeleteConfirmOpen && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[999] p-4 animate-fade-in">
+        <AccountDialog label={language === 'FR' ? 'Supprimer le compte' : 'Delete account'} close={() => setIsDeleteConfirmOpen(false)}>
           <div className="relative bg-neutral-950 border border-red-500/20 w-full max-w-sm rounded-lg p-6 shadow-2xl overflow-hidden text-center">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-red-600" />
             
@@ -640,7 +643,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             </button>
 
             <div className="mb-5 mt-1">
-              <span className="text-[8px] font-mono tracking-[0.3em] text-red-505 text-red-500 uppercase font-bold block mb-1">DANGER ZONE / PRIVATION PRIVILÈGES</span>
+              <span className="text-[8px] font-mono tracking-[0.3em] text-red-505 text-red-500 uppercase font-bold block mb-1">{localizedText("DANGER ZONE / PRIVATION PRIVILÈGES", language)}</span>
               <h3 className="text-sm font-light text-white uppercase tracking-widest">{language === 'FR' ? "SUPPRIMER LE COMPTE" : "DELETE ACCOUNT"}</h3>
               <p className="text-[10px] text-neutral-400 font-mono mt-3 leading-relaxed">
                 {language === 'FR' 
@@ -677,7 +680,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
               </button>
             </div>
           </div>
-        </div>
+        </AccountDialog>
       )}
     </header>
   );

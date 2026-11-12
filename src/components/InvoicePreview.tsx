@@ -14,10 +14,20 @@ async function localAssets() {
       for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
       return btoa(binary);
     };
-    const logo = await fetch('/logo.png');
-    const font = await fetch('/fonts/NotoSans-Regular.ttf');
+    const [logo, font] = await Promise.all([fetch('/logo.png'), fetch('/fonts/NotoSans-Regular.ttf')]);
     if (!logo.ok || !font.ok) throw new Error('Invoice assets unavailable');
-    return { logo: `data:image/png;base64,${encode(await logo.arrayBuffer())}`, font: encode(await font.arrayBuffer()) };
+    const logoBytes = await logo.arrayBuffer();
+    let logoData = `data:image/png;base64,${encode(logoBytes)}`;
+    try {
+      const bitmap = await createImageBitmap(new Blob([logoBytes], { type: 'image/png' }));
+      const scale = Math.min(1, 256 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (context) { context.imageSmoothingQuality = 'high'; context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); logoData = canvas.toDataURL('image/png'); }
+      bitmap.close();
+    } catch { /* Older browsers retain the original logo without blocking the invoice. */ }
+    return { logo: logoData, font: encode(await font.arrayBuffer()) };
   })().catch(error => { assets = null; throw error; });
   return assets;
 }

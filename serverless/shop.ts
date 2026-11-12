@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { handleWorkflow, workflowResources, workflowOrder } from '../src/server/workflows';
-import { queuePush } from '../src/server/push';
-import { exchangeRates } from '../src/server/exchangeRates';
+import { handleWorkflow, workflowResources, workflowOrder } from '../src/server/workflows.js';
+import { queuePush } from '../src/server/push.js';
+import { exchangeRates } from '../src/server/exchangeRates.js';
 import { randomUUID } from 'node:crypto';
-import { periodRange, readReportOrders, salesReport } from '../src/server/reports';
-import { assertSameOrigin, authRateLimit, readJson, requireUser, recordSecurityEvent } from '../src/server/security';
-import { sendEmail } from './_supabase';
-import { handleVipMessage } from '../src/server/vipMessages';
+import { periodRange, readReportOrders, salesReport } from '../src/server/reports.js';
+import { assertSameOrigin, authRateLimit, readJson, requireUser, recordSecurityEvent } from '../src/server/security.js';
+import { sendEmail } from './_supabase.js';
+import { handleVipMessage } from '../src/server/vipMessages.js';
 
 function json(res: any, status: number, body: any) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -529,7 +529,7 @@ export default async function handler(req: any, res: any) {
   try {
     if (!assertSameOrigin(req, res)) return;
     const resource = String(req.query?.resource || '').trim();
-    const adminOnly = ['analytics', 'security-logs', 'vip-message', 'drivers', 'ledger'].includes(resource)
+    const adminOnly = ['analytics', 'security-logs', 'vip-message', 'vip-customers', 'drivers', 'ledger'].includes(resource)
       || (['promos', 'announcements'].includes(resource) && req.method !== 'GET')
       || (resource === 'promos' && req.method === 'GET' && !req.query?.code)
       || (resource === 'reviews' && (req.query?.scope === 'admin' || ['PUT', 'DELETE'].includes(req.method) || req.query?.action === 'approve'));
@@ -538,6 +538,14 @@ export default async function handler(req: any, res: any) {
       if (!req.actor) return;
     }
     const supabase = supabaseAdmin();
+    if (resource === 'vip-customers') {
+      if (req.method !== 'GET') return json(res, 405, { error: 'method_not_allowed' });
+      const period = periodRange(req.query);
+      const result = await readReportOrders(supabase, period);
+      const report = salesReport(result.rows, period, result.truncated);
+      const customers = report.current.topCustomers.map(customer => ({ ...customer, whatsapp: result.rows.find(order => order.email?.toLowerCase() === customer.email)?.whatsapp || '' }));
+      return json(res, 200, { from: report.current.from, to: report.current.to, truncated: report.truncated, customers });
+    }
     if (resource === 'rates') {
       if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
       if (!await authRateLimit(req, res, 'exchange-rates', 30, 300)) return;

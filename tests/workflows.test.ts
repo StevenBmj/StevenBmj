@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createECDH, randomBytes } from 'node:crypto';
 import shop from '../serverless/shop';
 import login from '../serverless/auth/login';
+import register from '../serverless/auth/register';
 import { fakeSupabase, invoke, sessionHeaders, CLIENT_ID, OTHER_ID, ADMIN_ID } from './helpers/api';
 
 test('delivery, notifications and accounting routes require a verified session', async () => {
@@ -157,5 +158,27 @@ test('VIP outreach cannot send before explicit confirmation and recipient permis
   try {
     const response = await invoke(shop, { method: 'POST', headers: sessionHeaders(ADMIN_ID), query: { resource: 'vip-message' }, body: { customerName: 'Customer', email: 'client@example.test', message: 'Thank you for your order.' } });
     assert.equal(response.status, 400);
+  } finally { db.restore(); }
+});
+
+test('registration refuses missing, alphabetic or impossible international telephone numbers before creating Auth users', async () => {
+  const db = fakeSupabase();
+  try {
+    for (const whatsapp of ['', '+229abc123', '+2291']) {
+      const response = await invoke(register, { method: 'POST', body: { name: 'Client Essai', email: 'unused@example.test', password: 'Letters123!@#', whatsapp } });
+      assert.equal(response.status, 400);
+    }
+    assert.equal(db.requests.some(request => request.path === '/auth/v1/admin/users' && request.method === 'POST'), false);
+  } finally { db.restore(); }
+});
+
+test('an administrator with a verified second factor cannot use privileged routes with an aal1 session', async () => {
+  const db = fakeSupabase();
+  const admin = db.tables.profiles.find(profile => profile.id === ADMIN_ID)!;
+  admin.factors = [{ id: '00000000-0000-4000-8000-000000000088', factor_type: 'totp', status: 'verified' }];
+  try {
+    const response = await invoke(shop, { headers: sessionHeaders(ADMIN_ID), query: { resource: 'security-logs' } });
+    assert.equal(response.status, 403);
+    assert.equal(response.body.error, 'MFA_REQUIRED');
   } finally { db.restore(); }
 });

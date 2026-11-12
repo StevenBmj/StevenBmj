@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -130,7 +131,7 @@ export default function Boutique({ onSelectProduct }: BoutiqueProps) {
             {/* Control Header */}
             <div className="flex items-center space-x-2 text-white border-b border-white/5 pb-3">
               <SlidersHorizontal className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-semibold uppercase tracking-wider">FILTRES</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">{localizedText("FILTRES", language)}</span>
             </div>
 
             {/* Category selection */}
@@ -281,7 +282,7 @@ export default function Boutique({ onSelectProduct }: BoutiqueProps) {
                             setQuickViewProduct(product);
                           }}
                           className="p-3 bg-neutral-900/90 border border-white/10 text-white rounded-full hover:bg-amber-400 hover:text-black hover:border-amber-400 hover:scale-110 active:scale-95 duration-300 cursor-pointer shadow-xl"
-                          title="Aperçu rapide / Quick view"
+                          title={localizedText("Aperçu rapide / Quick view", language)}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -297,7 +298,7 @@ export default function Boutique({ onSelectProduct }: BoutiqueProps) {
                               ? 'bg-red-500/90 border-red-500 text-white hover:bg-red-600' 
                               : 'bg-neutral-900/90 border-white/10 text-neutral-300 hover:text-red-400'
                           }`}
-                          title="Ajouter aux favoris / Wishlist"
+                          title={localizedText("Ajouter aux favoris / Wishlist", language)}
                         >
                           <Heart className={`${isFavorite ? 'fill-current' : ''} w-4 h-4`} />
                         </button>
@@ -320,7 +321,7 @@ export default function Boutique({ onSelectProduct }: BoutiqueProps) {
 
                       {/* Title heading */}
                       <h3 className="text-sm font-light tracking-wide text-white group-hover:text-amber-400 duration-300">
-                        {language === 'FR' ? product.name : product.nameEn}
+                        <a href={`/produit/${encodeURIComponent(product.id)}${language === 'EN' ? '?lang=en' : ''}`} onClick={event => { event.stopPropagation(); if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onSelectProduct(product); } }}>{language === 'FR' ? product.name : product.nameEn || product.name}</a>
                       </h3>
 
                       {/* Brief text review */}

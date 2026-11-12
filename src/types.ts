@@ -81,6 +81,7 @@ export interface PromoCode {
 }
 
 export interface AppSettings {
+  seoIndexable?: boolean;
   homepageHeroTitle: string;
   homepageHeroTitleEn: string;
   homepageHeroSubtitle: string;

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { publicSettings, requireUser, readJson, reply } from '../src/server/security';
+import { publicSettings, requireUser, readJson, reply, recordSecurityEvent } from '../src/server/security.js';
 
 const json = reply;
 
@@ -27,18 +27,12 @@ function supabaseAdmin() {
 const readBody = (req: any) => readJson(req, 2_000_000);
 
 async function addSecurityLog(supabase: any, req: any, event: string, status = 'SECURED') {
-  await supabase.from('security_logs').insert({
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    timestamp: new Date().toISOString(),
-    ip: clientIp(req),
-    event: cleanText(event),
-    status,
-  }).then(() => null, () => null);
+  await recordSecurityEvent(req, event, status);
 }
 
 export default async function handler(req: any, res: any) {
   try {
-    if (req.method !== 'GET' && !(await requireUser(req, res, true))) return;
+    if (req.method !== 'GET') { req.actor = await requireUser(req, res, true); if (!req.actor) return; }
     const supabase = supabaseAdmin();
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
@@ -48,6 +42,7 @@ export default async function handler(req: any, res: any) {
 
     if (req.method === 'POST') {
       const body = await readBody(req);
+      if (body.seoIndexable !== undefined && typeof body.seoIndexable !== 'boolean') return json(res, 400, { error: 'Reglage SEO invalide.' });
       const current = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
       if (current.error) throw current.error;
       const merged = { ...publicSettings(current.data?.data), ...publicSettings(body) };

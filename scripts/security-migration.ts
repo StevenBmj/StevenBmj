@@ -24,12 +24,17 @@ const migrations = [
   '20261111220914_server_sessions_and_private_settings.sql',
   '20261112041430_invoice_snapshots.sql',
   '20261112044926_encrypted_assistant_credentials.sql',
+  '20261112071651_delivery_notifications_and_ledger.sql',
+  '20261112110449_database_advisor_hardening.sql',
 ].map(name => {
   const sql = readFileSync(resolve('supabase/migrations', name), 'utf8');
   return { name, sql, hash: createHash('sha256').update(sql).digest('hex') };
 });
 const apply = process.argv.includes('--apply');
 if (apply) {
+  const verification = JSON.parse(readFileSync(resolve('.codex-private/business-backup-verification.json'), 'utf8'));
+  if (verification.project !== ref || verification.scope !== 'all-public-table-data' || !verification.verified?.length
+    || Date.now() - Date.parse(verification.verifiedAt) > 30 * 60000) throw new Error('A fresh encrypted business backup and restoration rehearsal are required.');
   const folder = resolve('.codex-private');
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   if (process.platform === 'win32') {
@@ -67,6 +72,11 @@ await query(`begin;
       or has_table_privilege('anon', 'public.app_settings', 'SELECT')
       or has_function_privilege('anon', 'public.consume_security_limit(text,integer,integer)', 'EXECUTE') then
       raise exception 'Private resource privilege check failed';
+    end if;
+    if has_table_privilege('anon','public.order_delivery_proofs','SELECT')
+      or has_table_privilege('authenticated','public.notifications','SELECT')
+      or has_function_privilege('authenticated','public.sbmj_order_action(uuid,text,text,jsonb,integer,uuid)','EXECUTE') then
+      raise exception 'Workflow privacy check failed';
     end if;
   end $release$;
   ${apply ? 'commit' : 'rollback'};`);

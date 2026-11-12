@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { apiFetch } from '../lib/api';
 import { useApp } from './AppContext';
 
-type Notice = { id: string; kind: string; order_id?: string; read_at: string | null; created_at: string };
+type Notice = { id: string; kind: string; order_id?: string; read_at: string | null; created_at: string; targetView?: string };
 type Snapshot = { userId: string; items: Notice[]; unreadCount: number; sections?: Record<string, number>; pushPublicKey?: string };
 const Context = createContext<{
   items: Notice[]; unreadCount: number; error: string; loading: boolean; pushEnabled: boolean; pushAvailable: boolean;

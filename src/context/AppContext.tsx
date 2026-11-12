@@ -21,6 +21,8 @@ interface AppContextType {
   replaceCart: (items: OrderItem[]) => void;
   preparedContact: { name: string; email: string; message: string } | null;
   setPreparedContact: (draft: { name: string; email: string; message: string } | null) => void;
+  preparedVipMessage: string;
+  setPreparedVipMessage: (message: string) => void;
   wishlist: string[]; // array of product ids
   toggleWishlist: (productId: string) => void;
   history: string[]; // visited product ids
@@ -61,8 +63,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { route, openPanel, closePanel } = useNavigation();
-  const [language, setLanguageState] = useState<'FR' | 'EN'>('FR');
+  const { route, openPanel, closePanel, navigate } = useNavigation();
+  const [language, setLanguageState] = useState<'FR' | 'EN'>(() => route.language || (localStorage.getItem('sbmj_lang') === 'EN' ? 'EN' : 'FR'));
   const [currency, setCurrencyState] = useState<'EUR' | 'CFA' | 'USD'>('EUR');
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -79,6 +81,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUserState] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [preparedContact, setPreparedContact] = useState<AppContextType['preparedContact']>(null);
+  const [preparedVipMessage, setPreparedVipMessage] = useState('');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authEntry, setAuthEntry] = useState<AppContextType['authEntry']>(null);
   const openAuth = (mode: 'login' | 'register') => {
@@ -109,7 +112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Synchronize localStorage on mount
   useEffect(() => {
     const savedLang = localStorage.getItem('sbmj_lang');
-    if (savedLang === 'FR' || savedLang === 'EN') setLanguageState(savedLang);
+    if (!route.language && savedLang === 'EN') navigate({ ...route, language: 'EN' }, true);
 
     const savedCurr = localStorage.getItem('sbmj_curr');
     if (savedCurr === 'EUR' || savedCurr === 'CFA' || savedCurr === 'USD') setCurrencyState(savedCurr);
@@ -211,7 +214,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setLanguage = (lang: 'FR' | 'EN') => {
     setLanguageState(lang);
     localStorage.setItem('sbmj_lang', lang);
+    navigate({ ...route, language: lang }, true);
   };
+
+  useEffect(() => { setLanguageState(route.language === 'EN' ? 'EN' : 'FR'); }, [route.language]);
 
   const setCurrency = (curr: 'EUR' | 'CFA' | 'USD') => {
     setCurrencyState(curr);
@@ -325,13 +331,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (currency === 'USD' && !rates.USD) return new Intl.NumberFormat(language === 'FR' ? 'fr-FR' : 'en-GB', { style: 'currency', currency: 'EUR' }).format(priceInEur);
     const converted = priceInEur * rates[currency];
     if (currency === 'EUR') {
-      return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(converted);
+      return new Intl.NumberFormat(language === 'FR' ? 'fr-FR' : 'en-GB', { style: 'currency', currency: 'EUR' }).format(converted);
     }
     if (currency === 'USD') {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(converted);
     }
     // CFA Franc
-    return new Intl.NumberFormat('fr-FR', { 
+    return new Intl.NumberFormat(language === 'FR' ? 'fr-FR' : 'en-GB', {
       style: 'currency', 
       currency: 'XOF',
       minimumFractionDigits: 0,
@@ -378,6 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('sbmj_checkout_draft');
     setAuthCallback(null);
     setPreparedContact(null);
+    setPreparedVipMessage('');
     localStorage.removeItem('sbmj_user');
     sessionStorage.removeItem('sbmj_admin_auth');
   };
@@ -414,6 +421,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         replaceCart: saveCart,
         preparedContact,
         setPreparedContact,
+        preparedVipMessage,
+        setPreparedVipMessage,
         wishlist,
         toggleWishlist,
         history,

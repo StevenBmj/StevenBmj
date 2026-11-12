@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -107,12 +108,8 @@ export default function ContactUs() {
                 <div className="space-y-1">
                   <p className="text-white font-medium">{language === 'FR' ? "WHATSAPP & APPELS" : "WHATSAPP & CALLS"}</p>
                   <div className="flex flex-col space-y-1">
-                    <a href="https://wa.me/2290155468138" target="_blank" rel="noreferrer" className="text-neutral-400 hover:text-amber-400 font-mono transition-all block">
-                      WhatsApp : +229 01 55 46 81 38
-                    </a>
-                    <a href="tel:+2290144158044" className="text-neutral-400 hover:text-amber-400 font-mono transition-all block">
-                      Appels : +229 01 44 15 80 44
-                    </a>
+                    <a href="https://wa.me/2290155468138" target="_blank" rel="noreferrer" className="text-neutral-400 hover:text-amber-400 font-mono transition-all block">{localizedText("WhatsApp : +229 01 55 46 81 38", language)}</a>
+                    <a href="tel:+2290144158044" className="text-neutral-400 hover:text-amber-400 font-mono transition-all block">{localizedText("Appels : +229 01 44 15 80 44", language)}</a>
                   </div>
                 </div>
               </div>
@@ -233,7 +230,7 @@ export default function ContactUs() {
                 allowFullScreen={true}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                title="StevenBmj Cotonou location map"
+                title={localizedText("StevenBmj Cotonou location map", language)}
               />
             </div>
           </div>

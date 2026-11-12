@@ -21,6 +21,7 @@ import ContactUs from './views/ContactUs';
 import InvoiceVerification from './views/InvoiceVerification';
 import LuxuryChatbot from './components/LuxuryChatbot';
 import AuthModal from './components/AuthModal';
+import SeoMetadata from './components/SeoMetadata';
 import { Product } from './types';
 
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
@@ -52,6 +53,7 @@ function AppInner() {
 
   return (
     <div className="min-h-screen bg-black text-white relative flex flex-col justify-between selection:bg-amber-400 selection:text-black overflow-x-hidden w-full">
+      <SeoMetadata />
       
       {/* 2. Global Navbar Header */}
       <Header currentView={currentView} setView={setView} onOpenWishlist={() => setView('boutique')} />
@@ -76,7 +78,7 @@ function AppInner() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="w-full h-full"
           >
             {currentView === 'home' && (

@@ -63,6 +63,7 @@ export default function OrderWorkspace({ role }: { role: 'client' | 'driver' | '
   const [showInvoice, setShowInvoice] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<InvoiceFile | null>(null);
   const mounted = useRef(true);
+  const request = useRef({ key: '', id: '' });
   const selected = orders.find(order => order.id === selectedId);
 
   const load = async () => {
@@ -89,7 +90,7 @@ export default function OrderWorkspace({ role }: { role: 'client' | 'driver' | '
   }, [role, user?.id]);
   useEffect(() => { if (route.orderId) setSelectedId(route.orderId); }, [route.orderId]);
   useEffect(() => {
-    setHistory(null); setShowInvoice(false); setInvoiceFile(null); setFormAction(''); setFeedback('');
+    setHistory(null); setShowInvoice(false); setInvoiceFile(null); setFormAction('');
     if (!selected) return;
     const controller = new AbortController();
     void apiFetch(`/api/shop?resource=order-history&id=${encodeURIComponent(selected.id)}`, { signal: controller.signal })
@@ -101,11 +102,14 @@ export default function OrderWorkspace({ role }: { role: 'client' | 'driver' | '
 
   const submit = async (payload: any) => {
     if (!selected || busy) return;
+    const command = { ...payload, version: selected.workflowVersion || 0 };
+    const key = JSON.stringify([selected.id, command]);
+    if (request.current.key !== key) request.current = { key, id: crypto.randomUUID() };
     setBusy(true); setError(''); setFeedback('');
     try {
       const response = await apiFetch(`/api/shop?resource=order-action&id=${encodeURIComponent(selected.id)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, version: selected.workflowVersion || 0, requestId: crypto.randomUUID() }),
+        body: JSON.stringify({ ...command, requestId: request.current.id }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);

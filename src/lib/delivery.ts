@@ -1,4 +1,4 @@
-import type { Order } from '../types';
+import type { Order } from '../types.js';
 
 export interface DeliveryOrder extends Order {
   fulfilmentStatus: string;

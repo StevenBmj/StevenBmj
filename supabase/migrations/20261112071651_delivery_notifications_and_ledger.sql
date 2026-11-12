@@ -1,3 +1,5 @@
+alter table public.profiles add column whatsapp text check (whatsapp is null or whatsapp ~ '^\+[1-9][0-9]{7,14}$');
+
 create table public.driver_profiles (
   user_id uuid primary key references public.profiles(id),
   phone text not null check (phone ~ '^\+[0-9]{8,15}$'),
@@ -249,7 +251,11 @@ begin
     if lower(o.email) is distinct from lower(actor.email) then raise exception 'access_denied' using errcode='42501'; end if;
   else raise exception 'invalid_action' using errcode='22023'; end if;
   if p_request_id is null then raise exception 'request_id_required' using errcode='22023'; end if;
-  if exists(select 1 from public.order_events where actor_id=p_actor and request_id=p_request_id and order_id=p_order_id and kind=p_action) then return to_jsonb(o); end if;
+  if exists(select 1 from public.order_events where actor_id=p_actor and request_id=p_request_id) then
+    if exists(select 1 from public.order_events where actor_id=p_actor and request_id=p_request_id and order_id=p_order_id
+      and kind=p_action and details->>'requestDigest'=md5(p_payload::text)) then return to_jsonb(o); end if;
+    raise exception 'request_conflict' using errcode='23505';
+  end if;
   if p_expected_version is distinct from o.workflow_version then raise exception 'version_conflict' using errcode='40001'; end if;
   state:=o.fulfilment_status;
   old_driver:=o.assigned_driver_id;
@@ -364,7 +370,7 @@ begin
     update public.driver_profiles set available=(status='approved') where user_id=old_driver;
   end if;
   insert into public.order_events(id,order_id,actor_id,kind,request_id,details)
-    values(event_id,o.id,p_actor,p_action,p_request_id,jsonb_build_object('state',state,'note',left(coalesce(p_payload->>'note',''),1000),'driverId',o.assigned_driver_id));
+    values(event_id,o.id,p_actor,p_action,p_request_id,jsonb_build_object('state',state,'note',left(coalesce(p_payload->>'note',''),1000),'driverId',o.assigned_driver_id,'requestDigest',md5(p_payload::text)));
   insert into public.notifications(user_id,order_id,kind,event_key)
     select id,o.id,case when p_action='sign' then 'signed' when p_action='dispute' then 'disputed' when p_action='confirm' then 'completed' else p_action end,event_id::text
     from public.profiles where is_confirmed and (is_admin or lower(email)=lower(o.email) or id=o.assigned_driver_id)

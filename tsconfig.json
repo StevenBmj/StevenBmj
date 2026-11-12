@@ -1,4 +1,6 @@
 {
+  "include": ["src", "api", "serverless", "scripts", "tests", "server.ts", "vite.config.ts", "playwright.config.ts"],
+  "exclude": ["node_modules", "dist", ".server-build", ".vercel", ".codex-private", ".kilo", "test-results", "playwright-report"],
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,

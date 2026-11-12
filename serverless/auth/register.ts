@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { authRateLimit, hashCode, newCode, readJson, reply } from '../../src/server/security';
-import { sendEmail } from '../_supabase';
+import { authRateLimit, hashCode, newCode, readJson, reply } from '../../src/server/security.js';
+import { sendEmail } from '../_supabase.js';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 
 function isValidPersonName(value: string) {
@@ -59,6 +60,9 @@ export default async function handler(req: any, res: any) {
     const existing = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
     if (existing.error) throw existing.error;
     if (existing.data) return json(res, 409, { error: 'Cette adresse e-mail est deja utilisee. Connectez-vous ou utilisez Mot de passe oublie.' });
+    const whatsapp = typeof body.whatsapp === 'string' ? body.whatsapp.trim() : '';
+    const phone = /^\+[1-9]\d{7,14}$/.test(whatsapp) ? parsePhoneNumberFromString(whatsapp) : null;
+    if (!phone?.isPossible()) return json(res, 400, { error: 'Choisissez votre pays et saisissez un numero WhatsApp international valide.' });
 
     const isAdmin = false;
     const activationCode = isAdmin ? '' : generateActivationCode();
@@ -75,6 +79,7 @@ export default async function handler(req: any, res: any) {
       id: auth.data.user.id,
       name,
       email,
+      whatsapp: phone.number,
       google_linked: false,
       vip_points: 100,
       is_admin: isAdmin,

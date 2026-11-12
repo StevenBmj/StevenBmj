@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { localizedText } from '../lib/uiText';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { X, Mail, Lock, User, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
+import AccountDialog from './AccountDialog';
 
 declare global {
   interface Window {
@@ -20,6 +22,7 @@ declare global {
 }
 
 const ACTIVATION_WINDOW_SECONDS = 5 * 60;
+const CountryPhoneField = lazy(() => import('./CountryPhoneField'));
 
 export default function AuthModal() {
   const { 
@@ -36,6 +39,7 @@ export default function AuthModal() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [activationEmail, setActivationEmail] = useState('');
   const [activationDeadline, setActivationDeadline] = useState<number | null>(null);
@@ -48,25 +52,16 @@ export default function AuthModal() {
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showGoogleSim, setShowGoogleSim] = useState(false);
 
   const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const [googleButtonReady, setGoogleButtonReady] = useState(false);
-  const [googleAccounts, setGoogleAccounts] = useState<any[]>([]);
-  const [newGoogleName, setNewGoogleName] = useState('');
-  const [newGoogleEmail, setNewGoogleEmail] = useState('');
-  const [isAddingGoogle, setIsAddingGoogle] = useState(false);
-  const [googleAddError, setGoogleAddError] = useState('');
-
   useEffect(() => {
     if (!authEntry) return;
     setMode(authEntry.mode);
     setError('');
     setPassword('');
-    setShowPassword(false);
-    setShowGoogleSim(false);
-  }, [authEntry]);
+    setShowPassword(false);  }, [authEntry]);
 
   const startActivationTimer = (remaining: unknown) => {
     const seconds = typeof remaining === 'number' && Number.isFinite(remaining) ? Math.max(0, Math.min(ACTIVATION_WINDOW_SECONDS, remaining)) : 0;
@@ -94,7 +89,7 @@ export default function AuthModal() {
   }, [authModalOpen, activationDeadline, mode]);
 
   useEffect(() => {
-    if (!authModalOpen || showGoogleSim || (mode !== 'login' && mode !== 'register')) return;
+    if (!authModalOpen || (mode !== 'login' && mode !== 'register')) return;
     if (!googleClientId || !googleButtonRef.current) return;
 
     let cancelled = false;
@@ -159,36 +154,7 @@ export default function AuthModal() {
       script.onload = null;
       script.onerror = null;
     };
-  }, [authModalOpen, googleClientId, language, mode, showGoogleSim]);
-
-  const addNewGoogleAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    setGoogleAddError('');
-    if (!newGoogleName || !newGoogleEmail) {
-      setGoogleAddError(language === 'FR' ? "Tous les champs sont requis." : "All fields are required.");
-      return;
-    }
-    if (/\d/.test(newGoogleName)) {
-      setGoogleAddError(language === 'FR' ? "Le nom ne doit pas contenir de chiffres." : "The name cannot contain numbers.");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newGoogleEmail.trim().toLowerCase())) {
-      setGoogleAddError(language === 'FR' ? "Format d'adresse e-mail invalide." : "Invalid email format.");
-      return;
-    }
-    const initials = newGoogleName.trim().substring(0, 2).toUpperCase();
-    const newAcc = {
-      name: newGoogleName.trim(),
-      email: newGoogleEmail.trim().toLowerCase(),
-      avatar: initials || "G"
-    };
-
-    setGoogleAccounts([...googleAccounts, newAcc]);
-    setNewGoogleName('');
-    setNewGoogleEmail('');
-    setIsAddingGoogle(false);
-  };
+  }, [authModalOpen, googleClientId, language, mode]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +184,7 @@ export default function AuthModal() {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       const body = mode === 'login' 
         ? { email, password } 
-        : { name: fullName, email, password };
+        : { name: fullName, email, password, whatsapp };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -284,9 +250,7 @@ export default function AuthModal() {
       }
       setUser(data.user);
       addVipPoints(100);
-      executeAuthCallback();
-      setShowGoogleSim(false);
-      setAuthModalOpen(false);
+      executeAuthCallback();      setAuthModalOpen(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -431,26 +395,10 @@ export default function AuthModal() {
     document.head.appendChild(script);
   };
 
-  const handleGoogleSelect = async (_account?: any) => {
-    setError(language === 'FR'
-      ? "Les comptes Google fictifs ont été supprimés. Utilisez le bouton Google réel."
-      : "Fake Google accounts have been removed. Use real Google Sign-In."
-    );
-  };
-
   if (!authModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-      {/* Dynamic Background Glass blur & overlay */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setAuthModalOpen(false)}
-        className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
-      />
-
+    <AccountDialog label={language === 'FR' ? 'Accès au compte StevenBmj' : 'StevenBmj account access'} close={() => setAuthModalOpen(false)}>
       {/* Main Luxury Auth Dialog Box */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -465,8 +413,11 @@ export default function AuthModal() {
         {/* Close Button */}
         <button 
           id="btn-close-auth-modal"
+          type="button"
+          aria-label={language === 'FR' ? 'Fermer le formulaire' : 'Close account form'}
+          title={language === 'FR' ? 'Fermer' : 'Close'}
           onClick={() => setAuthModalOpen(false)}
-          className="absolute right-4 top-4 text-neutral-550 hover:text-white p-1 rounded-full hover:bg-white/5 duration-200 cursor-pointer text-neutral-500"
+          className="absolute right-2 top-2 flex size-11 items-center justify-center rounded text-neutral-400 hover:bg-white/5 hover:text-white"
         >
           <X className="w-5 h-5" />
         </button>
@@ -508,109 +459,7 @@ export default function AuthModal() {
           )}
         </AnimatePresence>
 
-        {/* Google Authentication Account Selection mockup overlay */}
         <AnimatePresence mode="wait">
-          {showGoogleSim ? (
-            <motion.div 
-              key="google-sim-view"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-4 py-4"
-            >
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
-                {/* Simulated Google Logo Icon */}
-                <svg className="h-5 w-5" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l3.245-3.125C18.465 2.016 15.635 1 12.24 1s-9 4.03-9 9 4.03 9 9 9c4.707 0 7.827-3.305 7.827-7.96 0-.53-.06-1.14-.175-1.655H12.24z"
-                  />
-                </svg>
-                <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  {language === 'FR' ? "Sélectionnez votre compte Google" : "Sign in with Google"}
-                </span>
-              </div>
-
-              <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1">
-                {googleAccounts.map((gAcc) => (
-                  <button 
-                    id={`btn-google-acc-${gAcc.email}`}
-                    key={gAcc.email}
-                    onClick={() => handleGoogleSelect(gAcc)}
-                    className="w-full p-3 bg-neutral-900/80 border border-white/5 hover:border-amber-500/30 rounded flex items-center gap-3 hover:bg-neutral-900 duration-200 cursor-pointer text-left"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-neutral-800 text-amber-500 font-bold border border-white/10 flex items-center justify-center text-xs font-mono shrink-0">
-                      {gAcc.avatar}
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs text-white font-semibold truncate leading-none">{gAcc.name}</p>
-                      <span className="text-[10px] text-neutral-500 font-mono truncate">{gAcc.email}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {isAddingGoogle ? (
-                <div className="p-3 bg-neutral-900 border border-white/5 rounded space-y-2.5 text-left">
-                  <h4 className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest leading-none mb-1">{language === 'FR' ? "AJOUTER UN AUTRE COMPTE GOOGLE" : "ADD ANOTHER GOOGLE ACCOUNT"}</h4>
-                  
-                  {googleAddError && (
-                    <p className="text-[9px] text-red-400 font-mono">{googleAddError}</p>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder={language === 'FR' ? "Nom Complet" : "Full Name"}
-                      value={newGoogleName}
-                      onChange={(e) => setNewGoogleName(e.target.value)}
-                      className="bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-[10px] text-white font-mono placeholder-neutral-600 focus:outline-none focus:border-amber-500/55 w-full"
-                    />
-                    <input
-                      type="text"
-                      placeholder="E-mail"
-                      value={newGoogleEmail}
-                      onChange={(e) => setNewGoogleEmail(e.target.value)}
-                      className="bg-neutral-950 border border-white/10 rounded px-2.5 py-1.5 text-[10px] text-white font-mono placeholder-neutral-600 focus:outline-none focus:border-amber-500/55 w-full"
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingGoogle(false)}
-                      className="flex-1 py-1.5 bg-neutral-950 text-neutral-400 hover:text-white rounded border border-white/10 font-mono text-[9px] uppercase cursor-pointer"
-                    >
-                      {language === 'FR' ? "Annuler" : "Cancel"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => addNewGoogleAccount(e as any)}
-                      className="flex-1 py-1.5 bg-amber-400 hover:bg-amber-300 text-black font-mono text-[9px] font-bold uppercase rounded cursor-pointer"
-                    >
-                      {language === 'FR' ? "Confirmer" : "Confirm"}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsAddingGoogle(true)}
-                  className="w-full py-2.5 border border-dashed border-white/10 hover:border-amber-500 hover:text-amber-400 text-[9px] font-mono uppercase text-amber-500 font-bold rounded cursor-pointer duration-300"
-                >
-                  + {language === 'FR' ? "AJOUTER UN AUTRE COMPTE" : "ADD ANOTHER ACCOUNT"}
-                </button>
-              )}
-
-              <button 
-                id="btn-cancel-google"
-                onClick={() => setShowGoogleSim(false)}
-                className="w-full py-2 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white rounded font-mono text-[10px] uppercase cursor-pointer duration-300"
-              >
-                {language === 'FR' ? "Retour au formulaire classique" : "Return to credentials"}
-              </button>
-            </motion.div>
-          ) : (
             <motion.form 
               key="manual-credentials-form"
               initial={{ opacity: 0, y: 10 }}
@@ -804,7 +653,7 @@ export default function AuthModal() {
                   {mode === 'register' && (
                     <div className="space-y-1 text-left animate-fade-in">
                       <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
-                        {language === 'FR' ? "Nom & Prénom d'Exception *" : "Your Absolute Full Name *"}
+                        {language === 'FR' ? 'Nom et prénom *' : 'Full name *'}
                       </label>
                       <div className="relative">
                         <User className="absolute left-3.5 top-3.5 w-4 h-4 text-neutral-600" />
@@ -815,13 +664,15 @@ export default function AuthModal() {
                           pattern="[^0-9]{2,}"
                           title={language === 'FR' ? "Le nom et le prenom ne doivent pas contenir de chiffres." : "The first and last name cannot contain numbers."}
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value.replace(/\d/g, ''))}
-                          placeholder="Steven Amorin"
+                          onChange={(e) => setFullName(e.target.value.normalize('NFC').replace(/[^\p{L}' -]/gu, ''))}
+                          placeholder={language === 'FR' ? 'Votre nom complet' : 'Your full name'}
                           className="w-full bg-neutral-900 border border-white/10 text-xs pl-10 pr-3.5 py-3.5 text-white rounded focus:border-amber-400 focus:outline-none placeholder-neutral-700"
                         />
                       </div>
                     </div>
                   )}
+
+                  {mode === 'register' && <Suspense fallback={<p role="status">{language === 'FR' ? 'Chargement des pays…' : 'Loading countries…'}</p>}><CountryPhoneField id="auth-input-whatsapp" language={language} value={whatsapp} onChange={setWhatsapp} /></Suspense>}
 
                   <div className="space-y-1 text-left animate-fade-in">
                     <label className="text-[9px] font-mono text-neutral-500 uppercase block tracking-wider">
@@ -891,7 +742,7 @@ export default function AuthModal() {
 
                   <div className="relative flex py-2 items-center">
                     <div className="flex-grow border-t border-white/5"></div>
-                    <span className="flex-shrink mx-3 text-neutral-600 text-[9px] font-mono uppercase tracking-widest">OU</span>
+                    <span className="flex-shrink mx-3 text-neutral-600 text-[9px] font-mono uppercase tracking-widest">{localizedText("OU", language)}</span>
                     <div className="flex-grow border-t border-white/5"></div>
                   </div>
 
@@ -968,24 +819,23 @@ export default function AuthModal() {
                       className="text-amber-500 hover:text-amber-400 font-mono text-[10px] uppercase tracking-wider underline cursor-pointer"
                     >
                       {mode === 'login'
-                        ? (language === 'FR' ? "Vous n'avez pas de compte ? Signez-ici" : "New collectionneur? Forge an identity here")
-                        : (language === 'FR' ? "Déjà membre de l'élite ? Connectez-vous" : "Already accredited? Establish session")}
+                        ? (language === 'FR' ? 'Créer un compte' : 'Create an account')
+                        : (language === 'FR' ? 'Se connecter' : 'Sign in')}
                     </button>
                   </div>
                 </>
               )}
 
             </motion.form>
-          )}
         </AnimatePresence>
 
         {/* Security watermark lines */}
         <div className="mt-6 border-t border-white/5 pt-4 flex items-center justify-between text-[8px] font-mono text-neutral-600 leading-none">
-          <span>✓ SECURED TRANSACTION SSL</span>
-          <span>SBMJ COGNITIVE PORTAL</span>
+          <span>{localizedText("✓ SECURED TRANSACTION SSL", language)}</span>
+          <span>{localizedText("SBMJ COGNITIVE PORTAL", language)}</span>
         </div>
 
       </motion.div>
-    </div>
+    </AccountDialog>
   );
 }

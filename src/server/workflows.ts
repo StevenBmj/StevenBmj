@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { authRateLimit, readJson, reply, type requireUser } from './security';
-import { queuePush, handlePushSubscription } from './push';
-import { readCashReport } from './cashReports';
-import { notificationSections } from '../lib/notifications';
+import { authRateLimit, readJson, reply, type requireUser } from './security.js';
+import { queuePush, handlePushSubscription } from './push.js';
+import { readCashReport } from './cashReports.js';
+import { notificationSections } from '../lib/notifications.js';
 
 type Actor = NonNullable<Awaited<ReturnType<typeof requireUser>>>;
 const uuid = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -37,7 +37,7 @@ export function receiptSignature(value: any) {
 
 function rpcError(res: any, error: any) {
   const known = ['version_conflict', 'order_not_found', 'access_denied', 'invalid_action', 'invalid_transition', 'payment_required',
-    'stock_required', 'driver_unavailable', 'invalid_payment', 'invalid_signature', 'invalid_receipt', 'note_required'];
+    'stock_required', 'driver_unavailable', 'invalid_payment', 'invalid_signature', 'invalid_receipt', 'note_required', 'request_conflict'];
   const code = known.find(value => String(error?.message || '').includes(value));
   return reply(res, code === 'access_denied' ? 403 : code === 'order_not_found' ? 404 : code ? 409 : 503, {
     error: code || 'workflow_unavailable',
@@ -69,13 +69,20 @@ export async function handleWorkflow(req: any, res: any, actor: Actor) {
       const items = await client.from('notifications').select('id,kind,order_id,created_at,read_at').eq('user_id', actor.profile.id).order('created_at', { ascending: false }).limit(100);
       const count = await client.from('notifications').select('id', { head: true, count: 'exact' }).eq('user_id', actor.profile.id).is('read_at', null);
       if (items.error || count.error) throw items.error || count.error;
+      const assigned = actor.profile.is_admin ? { data: [], error: null } : await client.from('orders').select('id').eq('assigned_driver_id', actor.profile.id);
+      if (assigned.error) throw assigned.error;
+      const missionIds = new Set((assigned.data || []).map((order: any) => order.id));
+      const inboxItems = (items.data || []).map((item: any) => ({ ...item,
+        targetView: actor.profile.is_admin ? 'god' : item.kind.startsWith('driver_') || missionIds.has(item.order_id) ? 'driver' : 'account',
+      }));
       const sections: Record<string, number> = {};
       for (const [section, kinds] of Object.entries(notificationSections)) {
         const total = await client.from('notifications').select('id', { head: true, count: 'exact' }).eq('user_id', actor.profile.id).is('read_at', null).in('kind', kinds);
         if (total.error || total.count === null) throw total.error || new Error('notification_count_unavailable');
         sections[section] = total.count;
       }
-      return reply(res, 200, { userId: actor.profile.id, items: items.data || [], unreadCount: count.count ?? (items.data || []).filter((n: any) => !n.read_at).length,
+      await queuePush(client);
+      return reply(res, 200, { userId: actor.profile.id, items: inboxItems, defaultPath: actor.profile.is_admin ? '/god' : missionIds.size ? '/livraisons' : '/compte', unreadCount: count.count ?? (items.data || []).filter((n: any) => !n.read_at).length,
         sections,
         pushPublicKey: process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY ? process.env.VAPID_PUBLIC_KEY : null });
     }

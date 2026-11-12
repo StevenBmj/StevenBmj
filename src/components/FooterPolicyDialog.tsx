@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { footerPolicies, type PolicyId } from './footerPolicies';
+import { useHistoryOverlay } from '../hooks/useHistoryOverlay';
 
 export default function FooterPolicyDialog({ policy, language, onDismiss }: {
   policy: PolicyId; language: 'FR' | 'EN'; onDismiss: () => void;
 }) {
+  useHistoryOverlay(true, onDismiss);
   const ref = useRef<HTMLDialogElement>(null);
   const document = footerPolicies[language][policy];
 

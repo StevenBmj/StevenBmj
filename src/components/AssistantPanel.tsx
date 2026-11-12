@@ -6,10 +6,10 @@ import { useNavigation } from '../context/NavigationContext';
 import Logo from './Logo';
 
 type Message = { role: 'user' | 'assistant'; content: string; recommendations?: string[];
-  contactDraft?: { name: string; email: string; message: string }; speechToken?: string };
+  contactDraft?: { name: string; email: string; message: string }; speechToken?: string; adminMessageDraft?: string };
 
 export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 'client' | 'admin'; onClose?: () => void }) {
-  const { language, products, addToCart, formatPrice, setPreparedContact } = useApp();
+  const { language, products, addToCart, formatPrice, setPreparedContact, setPreparedVipMessage } = useApp();
   const { navigate, setView } = useNavigation();
   const fr = language === 'FR';
   const [messages, setMessages] = useState<Message[]>([]);
@@ -19,6 +19,8 @@ export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 
   const [voice, setVoice] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [added, setAdded] = useState('');
+  const [reportPeriod, setReportPeriod] = useState('month');
+  const [reportDates, setReportDates] = useState({ from: '', to: '' });
   const list = useRef<HTMLDivElement>(null);
   const pending = useRef<AbortController | null>(null);
   const speechRequest = useRef<AbortController | null>(null);
@@ -71,7 +73,7 @@ export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 
   }
   async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (busy || !input.trim()) return;
+    if (busy || !input.trim() || scope === 'admin' && reportPeriod === 'custom' && (!reportDates.from || !reportDates.to)) return;
     const content = input.trim();
     const history = messages.slice(-8).map(({ role, content }) => ({ role, content }));
     setMessages(previous => [...previous, { role: 'user', content }]);
@@ -80,12 +82,12 @@ export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 
     const timer = window.setTimeout(() => controller.abort(), 42000);
     try {
       const response = await apiFetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope, language, message: content, history }), signal: controller.signal });
+        body: JSON.stringify({ scope, language, message: content, history, ...(scope === 'admin' ? { period: reportPeriod === 'custom' ? reportDates : { filter: reportPeriod } } : {}) }), signal: controller.signal });
       if (!response.ok) throw new Error('Unavailable');
       const data = await response.json();
       if (typeof data.reply !== 'string') throw new Error('Invalid response');
       const message: Message = { role: 'assistant', content: data.reply, recommendations: data.recommendations,
-        contactDraft: data.contactDraft, speechToken: data.speechToken };
+        contactDraft: data.contactDraft, speechToken: data.speechToken, adminMessageDraft: data.adminMessageDraft };
       setMessages(previous => [...previous, message]);
       void speak(message);
     } catch {
@@ -110,6 +112,7 @@ export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 
       </button>
       {onClose && <button id="btn-chatbot-close" type="button" onClick={onClose} aria-label={fr ? 'Fermer le conseiller' : 'Close advisor'} title={fr ? 'Fermer' : 'Close'} className="h-11 w-11 flex items-center justify-center text-neutral-400 hover:text-white"><X className="w-5 h-5" /></button>}
     </header>
+    {scope === 'admin' && <div className="flex shrink-0 flex-wrap items-end gap-3 border-b border-white/10 p-3 text-xs"><label>{fr ? 'Période analysée' : 'Reporting period'}<select value={reportPeriod} onChange={event => setReportPeriod(event.target.value)} className="mt-1 block min-h-11 rounded border border-white/20 bg-black px-2 text-sm">{['day', 'week', 'month', 'year', 'custom'].map((value, index) => <option key={value} value={value}>{(fr ? ['Aujourd’hui', 'Cette semaine', 'Ce mois', 'Cette année', 'Dates personnalisées'] : ['Today', 'This week', 'This month', 'This year', 'Custom dates'])[index]}</option>)}</select></label>{reportPeriod === 'custom' && (['from', 'to'] as const).map(key => <label key={key}>{key === 'from' ? (fr ? 'Du' : 'From') : (fr ? 'Au' : 'To')}<input type="date" value={reportDates[key]} onChange={event => setReportDates({ ...reportDates, [key]: event.target.value })} className="mt-1 block min-h-11 rounded border border-white/20 bg-black px-2 text-sm" /></label>)}</div>}
     <div ref={list} role="log" aria-live="polite" className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-5 text-sm leading-relaxed">
       {messages.length === 0 && <div className="py-5 space-y-4"><Bot className="h-7 w-7 text-amber-300" />
         <p className="text-neutral-200">{scope === 'admin' ? (fr ? 'Bonjour. Quel point souhaitez-vous examiner dans votre activité ?' : 'Hello. What would you like to review in your business?')
@@ -131,6 +134,7 @@ export default function AssistantPanel({ scope = 'client', onClose }: { scope?: 
         })}
         {scope === 'client' && message.contactDraft && <button type="button" onClick={() => { setPreparedContact(message.contactDraft!); setView('contact'); onClose?.(); }}
           className="mt-3 flex items-center gap-2 min-h-11 text-amber-300 text-xs">{fr ? 'Vérifier le message de contact' : 'Review contact message'}<ArrowRight className="h-4 w-4" /></button>}
+        {scope === 'admin' && message.adminMessageDraft && <div className="mt-3 space-y-3 border-l border-amber-400 pl-3"><p className="whitespace-pre-wrap break-words text-sm">{message.adminMessageDraft}</p><button type="button" onClick={() => { setPreparedVipMessage(message.adminMessageDraft!); navigate({ view: 'god', adminSection: 'users', panel: null }); }} className="inline-flex min-h-11 items-center gap-2 text-xs text-amber-300">{fr ? 'Choisir le client et vérifier le message' : 'Choose customer and review message'}<ArrowRight size={16} /></button></div>}
       </div>)}
       {busy && <p role="status" className="flex items-center gap-2 text-xs text-neutral-400"><LoaderCircle className="w-4 h-4 animate-spin" />{fr ? 'Le conseiller vous répond...' : 'Your advisor is replying...'}</p>}
       {error && <p role="alert" className="text-xs text-red-300">{error}</p>}

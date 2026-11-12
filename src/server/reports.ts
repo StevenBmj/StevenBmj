@@ -96,7 +96,7 @@ export async function readReportOrders(client: any, period: SalesPeriod) {
   const rows: any[] = [];
   let truncated = false;
   for (let offset = 0; offset < 20000; offset += 1000) {
-    const result = await client.from('orders').select('id,date,status,total_price,payment_status,currency,customer_name,email,items')
+    const result = await client.from('orders').select('id,date,status,total_price,payment_status,currency,customer_name,email,whatsapp,items')
       .gte('date', `${from}T00:00:00+01:00`).lt('date', `${shift(to, 1)}T00:00:00+01:00`).order('date').order('id').range(offset, offset + 999);
     if (result.error) throw new Error('Order reports unavailable');
     rows.push(...(result.data || []));

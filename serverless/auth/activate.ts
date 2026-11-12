@@ -1,5 +1,5 @@
-import { adminClient, authRateLimit, hashCode, issueVerifiedSession, matchesCode, newCode, readJson, reply, userView } from '../../src/server/security';
-import { sendEmail } from '../_supabase';
+import { adminClient, authRateLimit, hashCode, issueVerifiedSession, matchesCode, newCode, readJson, reply, userView } from '../../src/server/security.js';
+import { sendEmail } from '../_supabase.js';
 
 export default async function handler(req: any, res: any) {
   try {

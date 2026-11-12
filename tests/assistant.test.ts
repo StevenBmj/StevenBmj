@@ -7,6 +7,29 @@ import { ADMIN_ID, CLIENT_ID, fakeSupabase, invoke, sessionHeaders } from './hel
 const apiKey = 'sk-or-v1-TEST_ONLY_NEVER_A_REAL_KEY_123456789';
 const admin = sessionHeaders(ADMIN_ID);
 
+test('management advice uses the selected period, recorded cash and a draft that cannot send messages', async () => {
+  const db = fakeSupabase(); db.tables.ai_credentials = [];
+  process.env.AI_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+  const previous = globalThis.fetch;
+  let prompt = '';
+  globalThis.fetch = async (input: any, init: any) => {
+    if (String(input).startsWith('https://openrouter.ai/')) {
+      prompt = JSON.parse(init.body).messages[0].content;
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: 'Voici le rapport enregistré.', adminMessageDraft: 'Merci pour votre fidélité à StevenBmj.' }) } }] }));
+    }
+    return previous(input, init);
+  };
+  try {
+    await invoke(assistant, { method: 'POST', headers: admin, query: { resource: 'keys' }, body: { scope: 'admin', apiKey, model: 'openai/gpt-4o-mini' } });
+    const result = await invoke(assistant, { method: 'POST', headers: admin, body: { scope: 'admin', message: 'Prépare un remerciement', period: { from: '2026-10-01', to: '2026-10-31' } } });
+    assert.equal(result.status, 200);
+    assert.ok(prompt.includes('2026-10-01'));
+    assert.ok(prompt.includes('recordedCash'));
+    assert.equal(result.body.adminMessageDraft, 'Merci pour votre fidélité à StevenBmj.');
+    assert.equal(db.tables.outreach_messages.length, 0);
+  } finally { db.restore(); }
+});
+
 test('AI keys use authenticated encryption bound to their scope and id', () => {
   process.env.AI_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
   const encrypted = encryptKey(apiKey, 'id-one', 'client');

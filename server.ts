@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createServer as createHttpServer } from 'node:http';
 import { dispatchApi } from './src/server/apiRouter';
 import { reply } from './src/server/security';
+import { servePage } from './src/server/seo';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -30,8 +31,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const dist = path.resolve('dist');
-    app.use(express.static(dist));
-    app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
+    app.get('/sitemap.xml', (req, res, next) => { void servePage(req, res, 'sitemap.xml').catch(next); });
+    app.use(express.static(dist, { index: false }));
+    app.get('*', (req, res, next) => { void servePage(req, res, req.path).catch(next); });
   }
   const port = Number(process.env.PORT || 3000);
   httpServer.listen(port, '0.0.0.0', () => console.log(`StevenBmj: http://localhost:${port}`));

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { sendEmail } from '../../serverless/_supabase';
-import { authRateLimit, readJson, reply, recordSecurityEvent } from './security';
+import { sendEmail } from '../../serverless/_supabase.js';
+import { authRateLimit, readJson, reply, recordSecurityEvent } from './security.js';
 
 const clean = (value: unknown, max: number) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '';
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);

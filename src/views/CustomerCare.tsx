@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -29,10 +30,10 @@ export default function CustomerCare() {
         if (Array.isArray(parsed)) {
           return parsed.map((item: any) => ({
             qFr: item.q || item.qFr || '',
-            qEn: item.qEn || item.qEn || item.q || '',
+            qEn: item.qEn || '',
             aFr: item.a || item.aFr || '',
-            aEn: item.aEn || item.aEn || item.a || ''
-          }));
+            aEn: item.aEn || ''
+          })).filter((item: any) => language === 'FR' ? item.qFr && item.aFr : item.qEn && item.aEn);
         }
       } catch (e) {
         console.error("Error parsing settings.faqsJson", e);
@@ -43,26 +44,26 @@ export default function CustomerCare() {
       {
         qFr: "Comment se déroulent la livraison et l'expédition VIP ?",
         qEn: "How does the VIP shipping and delivery operate?",
-        aFr: "Nos créations sont emballées dans un coffret de cèdre naturel scellé à la cire dorée de la Maison. Les commandes de grande valeur sont expédiées par porteur privé de sécurité de bout en bout en Afrique de l'Ouest, Europe, Asie et Amérique.",
-        aEn: "Our creations are enveloped in natural cedar wood boxes hand-sealed with the House's golden wax. High value collections are carried by signature secure couriers across West Africa, Europe and the Americas."
+        aFr: 'Les modalités, les frais et le délai sont à confirmer avec StevenBmj selon votre adresse. Après validation du paiement et affectation, les étapes de livraison sont consultables dans votre compte.',
+        aEn: 'Delivery options, charges and timing must be confirmed with StevenBmj for your address. Once payment is verified and a driver is assigned, delivery stages are available in your account.'
       },
       {
         qFr: "Quelles sont les garanties d'authenticité et de noblesse des matières ?",
         qEn: "What are the authenticity and gold material guarantees?",
-        aFr: "Chaque bijou StevenBmj est poinçonné 'Or 18k' ou 'Platine 950' selon l'alliage de prestige choisi. Nos diamants disposent d'un certificat individuel de pureté VVS1 de l'institut de gemmologie. Nos calibres horlogers bénéficient d'une garantie internationale globale de 24 mois.",
-        aEn: "Every StevenBmj piece is hallmarked '18k Gold' or 'Platinum 950' depending on the alloy selected. Our diamonds are accompanied by authenticated VVS1 purity records from Swiss gemologists, while calibres carry international 24-month warranties."
+        aFr: 'Les matières, les caractéristiques et les garanties dépendent de chaque article. Consultez sa fiche et contactez la boutique pour obtenir les justificatifs disponibles avant de commander.',
+        aEn: 'Materials, specifications and warranties depend on each item. Check its product page and contact the shop for available supporting documents before ordering.'
       },
       {
         qFr: "Est-il possible d'ajuster une veste ou une manche à mes mesures ?",
         qEn: "Can I adjust a tailored suits jacket or sleeve to my exact size?",
-        aFr: "Absolument. Lors de la commande, indiquez vos mensurations dans l'espace 'Notes d'Atelier'. Notre maître tailleur procède gracieusement aux retouches de cintrage et d'ourlet dans nos salons de Cotonou ou Paris avant l'expédition.",
-        aEn: "Absolutely. When placing your order, specify your exact dimensions in the 'Atelier Notes' field. Our master tailors perform adjustments free of charge at our Cotonou or Paris salons prior to packaging."
+        aFr: 'Indiquez votre taille et vos besoins dans les notes de commande, puis faites confirmer la faisabilité et le tarif d’un ajustement par la boutique. Aucune retouche gratuite n’est présumée.',
+        aEn: 'Include your size and requirements in the order notes, then ask the shop to confirm whether an alteration is available and its price. Free alterations are not assumed.'
       },
       {
         qFr: "Quels sont les délais d'attribution des pièces d'exception ?",
         qEn: "What are the delivery lead times for highly limited pieces?",
-        aFr: "Pour les pièces signalées 'Édition de Prestige' ou sous commande, la fabrication requiert généralement 7 à 14 jours de façonnage minutieux au chalumeau d'artisanat d'art, suivis d'une expédition par coursier express immédiate.",
-        aEn: "For items labeled 'Prestige Edition' or custom orders, creation takes between 7 and 14 days of meticulous sculpting, followed by immediate express dispatch."
+        aFr: 'La disponibilité et le délai doivent être confirmés pour l’article choisi. Le conseiller peut vous orienter vers un article en stock lorsque votre premier choix n’est pas disponible.',
+        aEn: 'Availability and lead time must be confirmed for your selected item. The advisor can suggest an in-stock alternative when your first choice is unavailable.'
       }
     ];
   })();
@@ -107,7 +108,7 @@ export default function CustomerCare() {
           {settings?.careTitle ? (
             language === 'FR' ? settings.careTitle : settings.careTitleEn
           ) : (
-            "StevenBmj Concierge Desk"
+            language === 'FR' ? 'Service client StevenBmj' : 'StevenBmj customer care'
           )}
         </h1>
         <p className="text-xs text-neutral-500 max-w-2xl mt-1 leading-relaxed">
@@ -161,21 +162,21 @@ export default function CustomerCare() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
             <div className="bg-neutral-950 p-5 rounded border border-white/5 text-left">
               <Phone className="w-4.5 h-4.5 text-amber-500 mb-2 stroke-1" />
-              <p className="text-[10px] font-mono text-neutral-500 uppercase">WhatsApp Direct Concierge</p>
+              <p className="text-[10px] font-mono text-neutral-500 uppercase">{localizedText("WhatsApp Direct Concierge", language)}</p>
               <a 
-                href="https://wa.me/22955468138" 
+                href={`https://wa.me/${(settings?.whatsappContact || '+2290155468138').replace(/\D/g, '')}`}
                 target="_blank" 
                 rel="noreferrer" 
                 className="text-xs text-white hover:text-amber-400 duration-300 font-bold tracking-wider mt-1 block"
               >
-                +229 55 46 81 38 (24/7)
+                {settings?.whatsappContact || '+229 01 55 46 81 38'}
               </a>
             </div>
 
             <div className="bg-neutral-950 p-5 rounded border border-white/5 text-left">
               <Clock className="w-4.5 h-4.5 text-amber-500 mb-2 stroke-1" />
               <p className="text-[10px] font-mono text-neutral-500 uppercase">{language === 'FR' ? 'Temps de Réponse' : 'Response Time'}</p>
-              <p className="text-xs text-white mt-1 font-bold">{language === 'FR' ? 'Moins de 15 minutes' : 'Under 15 minutes'}</p>
+              <p className="text-xs text-white mt-1 font-bold">{language === 'FR' ? 'Selon la disponibilité de l’équipe' : 'Subject to team availability'}</p>
             </div>
           </div>
 
@@ -197,7 +198,7 @@ export default function CustomerCare() {
           {submitted ? (
             <div className="p-8 border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-center rounded space-y-3 font-mono text-xs uppercase">
               <p className="text-base font-bold text-white">{language === 'FR' ? '✓ Vœu Transmis avec Succès' : '✓ Request Sent Successfully'}</p>
-              <p>{language === 'FR' ? 'Votre ordonnance a été consignée sous clé. Nous vous répondrons sous 15 minutes par mail de prestige.' : 'Your request has been securely recorded. We will reply within 15 minutes by email.'}</p>
+              <p>{language === 'FR' ? 'Votre demande a été transmise à StevenBmj. La réponse sera adressée à l’e-mail indiqué.' : 'Your request has been sent to StevenBmj. The response will be addressed to the email you provided.'}</p>
               <button
                 onClick={() => setSubmitted(false)}
                 className="text-amber-500 underline text-[10px] tracking-widest block mx-auto pt-4 font-bold cursor-pointer"
@@ -231,7 +232,7 @@ export default function CustomerCare() {
                   required
                   value={careEmail}
                   onChange={(e) => setCareEmail(e.target.value)}
-                  placeholder="Steven@ambassadeur.org"
+                  placeholder={language === 'FR' ? 'Votre adresse e-mail' : 'Your email address'}
                   className="w-full bg-neutral-950 border border-white/10 text-xs px-3.5 py-3 text-white focus:outline-none focus:border-amber-400 rounded"
                 />
               </div>

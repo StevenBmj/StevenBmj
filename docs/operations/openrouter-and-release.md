@@ -48,11 +48,12 @@ model never submits a contact message, payment or campaign by itself.
 - Rotate previously disclosed credentials with their providers. Removing the
   tracked JSON snapshot does not remove secrets from Git history.
 - Run lint, unit tests, production build, browser tests, audit and secret checks.
-- `npx tsx scripts/security-migration.ts --check` validates all three migrations
+- `npx tsx scripts/security-migration.ts --check` validates all five migrations
   in one transaction and rolls back. It verifies the target identity, data counts
   and private grants. This does not apply persistent changes.
-- For an authorized coordinated deployment, `--apply` takes a restricted local
-  metadata backup and applies the release transaction. Do not apply the settings
+- For an authorized coordinated deployment, `--apply` requires a fresh encrypted
+  business-data backup with restoration checks, takes restricted metadata and applies
+  the release transaction. Do not apply the settings
   purge while an old production frontend still relies on the legacy settings.
 - The release registry rejects modified already-applied migrations and permits
   retries without reapplying completed files. Do not run the old seed/schema
@@ -64,10 +65,13 @@ model never submits a contact message, payment or campaign by itself.
 
 Tests cover session boundaries, private configuration, code replay, ownership,
 encrypted credentials, scoped prompts, signed speech, PDF geometry and exact
-preview/download byte equality. Supabase migrations were checked and rolled back;
-the live email/provider calls and complete production deployment are not implied.
+preview/download byte equality. Five Supabase migrations have now been applied.
+The owner confirmed reception of two real messaging checks. These checks do not
+imply that every external provider or real-device workflow has passed acceptance.
 No independent penetration test or claim of invulnerability is made.
 
-Remaining programme items include driver approval/assignment/signature workflow,
-private notification centre and push/PWA, payment/cost accounting ledgers, global
-FR/EN and SEO review, MFA and a coordinated credential-rotation/release exercise.
+Delivery/signature workflows, private notifications, push/PWA, payment/cost ledgers,
+FR/EN interface and SEO updates, and administrator MFA are implemented. Consult
+[the release evidence](2026-11-12-release-progress.md) for current verification,
+publication, credential retirement and remaining external acceptance. Do not use
+this setup guide as evidence of a completed production release.

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { readJson, reply } from './security';
+import { readJson, reply } from './security.js';
 
 function subscriptionValue(value: any) {
   try {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Archive, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
+import AdminMfa from './AdminMfa';
 
 export default function SecurityConsole() {
   const { language } = useApp();
@@ -42,9 +43,11 @@ export default function SecurityConsole() {
     const day = Number.isFinite(instant.getTime()) ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Porto-Novo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant) : String(log.timestamp);
     return matches && (!date || day === date);
   });
+  const blockedCount = logs.filter(log => ['BLOCKED', 'ATTACK_BLOCKED', 'ACCESS_REFUSED', 'RATE_LIMITED'].includes(log.status)).length;
   return <section className="min-w-0 space-y-6" aria-label={fr ? 'Journaux de sécurité' : 'Security logs'}>
+    <AdminMfa />
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5"><h2 className="flex items-center gap-3 text-2xl font-medium"><ShieldAlert size={22} />{fr ? 'Sécurité et accès' : 'Security and access'}</h2><button disabled={loading} onClick={() => void load()} aria-label={fr ? 'Actualiser les journaux' : 'Refresh logs'} title={fr ? 'Actualiser' : 'Refresh'} className="flex size-11 items-center justify-center rounded border border-white/20"><RefreshCw size={18} /></button></div>
-    <div className="grid gap-4 border-b border-white/10 pb-5 sm:grid-cols-3"><div><p className="text-sm text-neutral-400">{fr ? 'Événements chargés' : 'Loaded events'}</p><p className="mt-2 text-xl">{logs.length}</p></div><div><p className="text-sm text-neutral-400">{fr ? 'Refus et limitations enregistrés' : 'Recorded refusals and rate limits'}</p><p className="mt-2 text-xl">{logs.filter(log => ['ATTACK_BLOCKED', 'ACCESS_REFUSED', 'RATE_LIMITED'].includes(log.status)).length}</p></div><div><p className="text-sm text-neutral-400">{fr ? 'Événements filtrés' : 'Matching events'}</p><p className="mt-2 text-xl">{visible.length}</p></div></div>
+    <div className="grid gap-4 border-b border-white/10 pb-5 sm:grid-cols-3"><div><p className="text-sm text-neutral-400">{fr ? 'Événements chargés' : 'Loaded events'}</p><p className="mt-2 text-xl">{logs.length}</p></div><div><p className="text-sm text-neutral-400">{fr ? 'Refus et limitations enregistrés' : 'Recorded refusals and rate limits'}</p><p className="mt-2 text-xl">{blockedCount}</p></div><div><p className="text-sm text-neutral-400">{fr ? 'Événements filtrés' : 'Matching events'}</p><p className="mt-2 text-xl">{visible.length}</p></div></div>
     <div className="flex flex-wrap items-end gap-4"><label className="min-w-0 flex-1 text-sm"><span className="flex items-center gap-2"><Search size={16} />{fr ? 'Rechercher' : 'Search'}</span><input value={search} onChange={event => setSearch(event.target.value)} className="mt-2 min-h-11 w-full rounded border border-white/20 bg-black px-3 text-base" /></label><label className="text-sm">Date<input type="date" value={date} onChange={event => setDate(event.target.value)} className="mt-2 block min-h-11 rounded border border-white/20 bg-black px-3 text-base" /></label><button onClick={() => { setSearch(''); setDate(''); }} className="min-h-11 rounded border border-white/20 px-4 text-sm">{fr ? 'Réinitialiser' : 'Reset'}</button></div>
     <div className="flex flex-wrap items-center justify-between gap-4"><label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={archives} onChange={event => setArchives(event.target.checked)} className="size-5 accent-amber-400" />{fr ? 'Inclure les archives' : 'Include archive'}</label><button disabled={loading} onClick={() => void archive()} className="inline-flex min-h-11 items-center gap-2 rounded border border-white/20 px-4 text-sm"><Archive size={16} />{fr ? 'Vider la vue active (archiver)' : 'Clear active view (archive)'}</button></div>
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}{loading && <p role="status" className="text-sm text-neutral-400">{fr ? 'Chargement…' : 'Loading…'}</p>}

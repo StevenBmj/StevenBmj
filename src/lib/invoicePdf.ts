@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
-import { invoiceModel } from './invoice';
-import type { Order } from '../types';
+import { invoiceModel } from './invoice.js';
+import type { Order } from '../types.js';
 
 export type InvoiceAssets = { logo: string; font: string; qr: string };
 export type InvoiceFile = { bytes: Uint8Array; url: string; filename: string; sha256: string; orderId: string; language: 'FR' | 'EN' };
@@ -29,7 +29,7 @@ export function createInvoicePdf(order: Order, language: 'FR' | 'EN', assets: In
     doc.setFillColor(10, 10, 10); doc.rect(0, 0, width, height, 'F');
     doc.setDrawColor(139, 100, 33); doc.setLineWidth(0.8);
     doc.rect(22, 22, width - 44, height - 44); doc.rect(26, 26, width - 52, height - 52);
-    doc.addImage(assets.logo, 'PNG', margin, 39, 42, 42);
+    doc.addImage(assets.logo, 'PNG', margin, 39, 42, 42, 'stevenbmj-logo', 'FAST');
     doc.setFont('Noto'); doc.setFontSize(19); doc.setTextColor(245, 245, 245);
     doc.text('STEVENBMJ', margin + 54, 63);
     doc.setFontSize(7); doc.setTextColor(...gold);
@@ -74,7 +74,7 @@ export function createInvoicePdf(order: Order, language: 'FR' | 'EN', assets: In
   });
   let y = lastY() + 18;
   if (y + 88 > height - 48) { doc.addPage(); frame(); y = 119; }
-  doc.addImage(assets.qr, 'PNG', margin, y, 64, 64);
+  doc.addImage(assets.qr, 'PNG', margin, y, 64, 64, 'invoice-qr', 'FAST');
   doc.setTextColor(...gold); doc.setFontSize(9);
   doc.text(copy('RÉFÉRENCE DE LA COMMANDE', 'ORDER REFERENCE'), margin + 78, y + 21);
   doc.setTextColor(...muted); doc.setFontSize(8);

@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /god
+Disallow: /compte
+Disallow: /livraisons
+Disallow: /verification/
+Disallow: /*?panel=
 
 Sitemap: https://stevenbmj.vercel.app/sitemap.xml

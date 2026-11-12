@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -213,8 +214,7 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           {language === 'FR' ? 'Retour' : 'Back'}
         </button>
-        <span className="ml-4 min-w-0 break-words text-right text-[10px] font-mono text-neutral-600 block uppercase">
-          STEVENBMJ HAUTE COUTURE SYSTEM CODE: {product.id}
+        <span className="ml-4 min-w-0 break-words text-right text-[10px] font-mono text-neutral-600 block uppercase">{localizedText("STEVENBMJ HAUTE COUTURE SYSTEM CODE:", language)}{product.id}
         </span>
       </div>
 

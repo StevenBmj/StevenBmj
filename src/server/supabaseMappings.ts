@@ -1,4 +1,4 @@
-import type { Order, Product, PromoCode } from '../types';
+import type { Order, Product, PromoCode } from '../types.js';
 
 export function productToRow(product: Product) {
   return {

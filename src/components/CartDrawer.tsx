@@ -1,3 +1,4 @@
+import { localizedText } from '../lib/uiText';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -175,7 +176,7 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
                                   id={`btn-cart-remove-${idx}`}
                                   onClick={() => removeFromCart(item.product.id, item.selectedSize)}
                                   className="text-neutral-500 hover:text-red-400 duration-300 cursor-pointer"
-                                  title="Supprimer la sélection"
+                                  title={localizedText("Supprimer la sélection", language)}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -281,7 +282,7 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
 
                     <div className="flex items-center justify-center gap-1.5 text-[9px] text-neutral-500 uppercase tracking-widest text-center mt-2 font-mono">
                       <ShieldCheck className="w-3.5 h-3.5 text-amber-500/80" />
-                      <span>FACTURATION SÉCURISÉE • RÈGLEMENT WHATSAPP</span>
+                      <span>{localizedText("FACTURATION SÉCURISÉE • RÈGLEMENT WHATSAPP", language)}</span>
                     </div>
                   </div>
 

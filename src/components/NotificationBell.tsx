@@ -6,8 +6,10 @@ import { useNavigation } from '../context/NavigationContext';
 import { deliveryLabel } from '../lib/delivery';
 import { notificationSection } from '../lib/notifications';
 import type { AdminSection } from '../lib/navigation';
+import { useHistoryOverlay } from '../hooks/useHistoryOverlay';
 
 function Inbox({ close }: { close: () => void }) {
+  useHistoryOverlay(true, close);
   const { user, language } = useApp();
   const { items, unreadCount, error, loading, load, markRead, pushEnabled, pushAvailable, togglePush, install, installAvailable } = useNotifications();
   const { navigate } = useNavigation();
@@ -36,7 +38,7 @@ function Inbox({ close }: { close: () => void }) {
           await markRead(item.id);
           close();
           const section = notificationSection(item.kind) as AdminSection | undefined;
-          navigate({ view: user?.isAdmin ? 'god' : item.kind.startsWith('driver_') || item.kind === 'assign' ? 'driver' : 'account', ...(user?.isAdmin && section ? { adminSection: section } : {}), ...(item.order_id ? { orderId: item.order_id } : {}), panel: null });
+          navigate({ view: user?.isAdmin ? 'god' : item.targetView === 'driver' || item.kind.startsWith('driver_') ? 'driver' : 'account', ...(user?.isAdmin && section ? { adminSection: section } : {}), ...(item.order_id ? { orderId: item.order_id } : {}), panel: null });
         })}><span className={`block text-sm leading-6 ${item.read_at ? 'text-neutral-400' : 'font-semibold text-amber-300'}`}>{deliveryLabel(item.kind, language)}</span>{item.order_id && <span className="mt-1 block break-all text-xs text-neutral-400">{item.order_id}</span>}<span className="mt-2 block text-xs text-neutral-500">{new Date(item.created_at).toLocaleString(fr ? 'fr-FR' : 'en-GB')}</span></button></li>)}</ul>}
         <div className="mt-5 space-y-4 border-t border-white/10 pt-5">{pushAvailable && <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={pushEnabled} disabled={busy} onChange={event => void action(() => togglePush(event.target.checked))} className="size-5 accent-amber-400" />{fr ? 'Notifications sur cet appareil' : 'Notifications on this device'}</label>}
           {installAvailable && <button onClick={() => void action(install)} className="inline-flex min-h-11 items-center gap-2 rounded border border-white/20 px-3 text-sm"><Download size={18} />{fr ? 'Installer StevenBmj' : 'Install StevenBmj'}</button>}

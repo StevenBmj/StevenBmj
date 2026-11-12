@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireUser, readJson, reply, recordSecurityEvent } from '../src/server/security';
+import { requireUser, readJson, reply, recordSecurityEvent } from '../src/server/security.js';
+import { storeCatalogueImage } from '../src/server/catalogueMedia.js';
 
 const json = reply;
 
@@ -58,11 +59,11 @@ function productToRow(product: any) {
     description_en: cleanText(product.descriptionEn || product.description_en || product.description, 2000),
     category: cleanText(product.category || 'watches', 40),
     images,
-    price: Math.max(0, Number(product.price || 0)),
-    promo_price: product.promoPrice === undefined || product.promoPrice === '' || product.promoPrice === null ? null : Math.max(0, Number(product.promoPrice)),
-    stock: Math.max(0, Number(product.stock || 0)),
-    rating: Math.max(0, Math.min(5, Number(product.rating || 4.8))),
-    specs: Array.isArray(product.specs) ? product.specs.slice(0, 20) : [],
+    price: Number(product.price),
+    promo_price: product.promoPrice === undefined || product.promoPrice === '' || product.promoPrice === null ? null : Number(product.promoPrice),
+    stock: Number(product.stock ?? 0),
+    rating: Number(product.rating ?? 0),
+    specs: Array.isArray(product.specs) ? product.specs.slice(0, 20).map((spec: any) => ({ key: cleanText(spec?.key, 100), value: cleanText(spec?.value, 500) })).filter((spec: any) => spec.key && spec.value) : [],
     is_exclu: Boolean(product.isExclu),
     is_new: Boolean(product.isNew),
     badge: product.badge ? cleanText(product.badge, 80) : null,
@@ -94,9 +95,20 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'POST') {
       const body = await readBody(req);
       const row = productToRow(body);
-      if (!row.name || !row.description || row.price <= 0 || row.images.length === 0) {
+      const validMoney = (value: number) => Number.isFinite(value) && value > 0 && value <= 1e9 && Math.abs(value * 100 - Math.round(value * 100)) < 1e-5;
+      const validImage = (value: string) => value.length <= 1_500_000 && (
+        /^\/(?!\/)[a-z0-9/_.,% -]+$/i.test(value) || /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value)
+        || (() => { try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; } })()
+      );
+      if (!row.name || !row.description || !validMoney(row.price) || !Number.isSafeInteger(row.stock) || row.stock < 0 || row.stock > 1e7
+        || !Number.isFinite(row.rating) || row.rating < 0 || row.rating > 5
+        || row.promo_price !== null && (!validMoney(row.promo_price) || row.promo_price >= row.price)
+        || row.images.length === 0 || !row.images.every(validImage)) {
         return json(res, 400, { error: 'Nom, description, prix et image produit sont requis.' });
       }
+      const images: string[] = [];
+      for (const image of row.images) images.push(await storeCatalogueImage(supabase, image));
+      row.images = images;
       const { data, error } = await supabase.from('products').upsert(row, { onConflict: 'id' }).select('*').single();
       if (error) throw error;
       await addSecurityLog(supabase, req, `Produit sauvegarde: ${row.name}`, 'SECURED');

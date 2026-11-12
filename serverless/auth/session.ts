@@ -1,9 +1,9 @@
-import { activeSession, adminClient, assertSameOrigin, authRateLimit, clearSession, readCookies, readJson, reply, requireUser, userView, writeSessionCookies } from '../../src/server/security';
+import { activeSession, adminClient, assertSameOrigin, authRateLimit, clearSession, readCookies, readJson, reply, requireUser, userView, writeSessionCookies, sessionProfile } from '../../src/server/security.js';
 
 export default async function handler(req: any, res: any) {
   try {
     if (req.method === 'GET') {
-      const actor = await requireUser(req, res);
+      const actor = await requireUser(req, res, false, true);
       if (actor) reply(res, 200, { user: userView(actor.profile) });
       return;
     }
@@ -49,7 +49,7 @@ export default async function handler(req: any, res: any) {
     if (profile.error) throw new Error('Unable to read profile');
     if (!profile.data?.is_confirmed) return reply(res, 401, { error: 'Compte non actif.' });
     writeSessionCookies(req, res, auth.data.session);
-    return reply(res, 200, { user: userView(profile.data) });
+    return reply(res, 200, { user: userView(sessionProfile(profile.data, auth.data.user, auth.data.session.access_token)) });
   } catch {
     return reply(res, 503, { error: 'Session temporairement indisponible.' });
   }

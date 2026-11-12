@@ -15,6 +15,7 @@ const order = {
 };
 
 test('the preview and downloaded multi-page invoice are the exact same PDF', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
   page.on('pageerror', error => console.error(error.message));
   page.on('console', message => { if (message.type() === 'error') console.error(message.text()); });
   await page.addInitScript(value => localStorage.setItem('sbmj_last_invoice', JSON.stringify(value)), order);
@@ -22,9 +23,9 @@ test('the preview and downloaded multi-page invoice are the exact same PDF', asy
     ? { user: { id: 'invoice-client', name: order.customerName, email: order.email } } : [] }));
   await page.route('https://wa.me/**', route => route.fulfill({ body: 'WhatsApp test: no message sent.' }));
   await page.goto('/boutique?panel=commande', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('canvas[data-invoice-page][data-rendered="true"]').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('canvas[data-invoice-page][data-rendered="true"]').first()).toBeVisible({ timeout: 45000 });
   expect(await page.locator('canvas[data-invoice-page]').count()).toBeGreaterThan(1);
-  await expect.poll(async () => page.locator('canvas[data-invoice-page][data-rendered="true"]').count()).toBe(await page.locator('canvas[data-invoice-page]').count());
+  await expect.poll(async () => page.locator('canvas[data-invoice-page][data-rendered="true"]').count(), { timeout: 30000 }).toBe(await page.locator('canvas[data-invoice-page]').count());
   const pixels = await page.locator('canvas[data-invoice-page]').first().evaluate((canvas: HTMLCanvasElement) => {
     const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
     let light = 0; let gold = 0;

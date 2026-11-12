@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fallbackRoute, readRoute, routeHref } from '../src/lib/navigation';
+import { fallbackRoute, initialHistoryRoutes, readRoute, routeHref } from '../src/lib/navigation';
+
+test('direct entry builds a finite native-back history without losing the selected language or checkout', () => {
+  const steps = initialHistoryRoutes({ view: 'produit', productId: 'watch', panel: 'commande', language: 'EN' });
+  assert.deepEqual(steps.map(routeHref), ['/?lang=en', '/?lang=en', '/boutique?lang=en', '/produit/watch?lang=en', '/produit/watch?lang=en&panel=commande']);
+  assert.equal(initialHistoryRoutes({ view: 'home', panel: null }).length, 2);
+});
 
 test('deep links restore the selected product and shopping step', () => {
   assert.deepEqual(readRoute({ href: 'https://stevenbmj.vercel.app/produit/watch%20one?panel=panier' }), {
@@ -8,6 +14,13 @@ test('deep links restore the selected product and shopping step', () => {
   });
   assert.equal(routeHref({ view: 'produit', productId: 'watch one', panel: 'commande' }), '/produit/watch%20one?panel=commande');
   assert.deepEqual(readRoute({ href: 'https://stevenbmj.vercel.app/#/god' }), { view: 'god', panel: null });
+});
+
+test('FAQ deep links retain their anchor when seeding native history and changing language', () => {
+  const route = readRoute({ href: 'https://stevenbmj.vercel.app/aide?lang=en#faq' });
+  assert.equal(routeHref(route), '/aide?lang=en#faq');
+  assert.equal(routeHref(initialHistoryRoutes(route).at(-1)!), '/aide?lang=en#faq');
+  assert.equal(routeHref(readRoute({ href: 'https://stevenbmj.vercel.app/contact#unexpected' })), '/contact');
 });
 
 test('malformed or unknown destinations do not restore arbitrary views', () => {

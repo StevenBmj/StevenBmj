@@ -3,10 +3,10 @@ import { ExternalLink, Send, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../lib/api';
 
-export default function VipMessageComposer({ recipient, close }: { recipient: { customerName: string; email?: string; whatsapp?: string }; close: () => void }) {
+export default function VipMessageComposer({ recipient, close, initialMessage = '' }: { recipient: { customerName: string; email?: string; whatsapp?: string }; close: () => void; initialMessage?: string }) {
   const { language } = useApp();
   const fr = language === 'FR';
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(initialMessage);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<any>(null);

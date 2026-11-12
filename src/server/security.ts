@@ -92,8 +92,17 @@ export function clearSession(req: any, res: any) {
 
 export function userView(profile: any) {
   return { id: profile.id, name: profile.name, email: profile.email,
+    whatsapp: profile.whatsapp || undefined,
     avatarUrl: profile.avatar_url || undefined, googleLinked: Boolean(profile.google_linked),
-    vipPoints: Number(profile.vip_points || 0), isAdmin: profile.is_admin === true };
+    vipPoints: Number(profile.vip_points || 0), isAdmin: profile.is_admin === true, mfaRequired: profile.mfaRequired === true };
+}
+
+// Call only after Auth has verified the access token; decoded claims alone are not authentication.
+export function sessionProfile(profile: any, identity: any, token: string) {
+  const enrolled = identity?.factors?.some((factor: any) => factor.status === 'verified') === true;
+  let assurance = '';
+  try { assurance = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).aal; } catch { /* Missing assurance cannot satisfy MFA. */ }
+  return { ...profile, mfaRequired: profile.is_admin === true && enrolled && assurance !== 'aal2' };
 }
 
 export async function activeSession(client: any, token: string, userId: string) {
@@ -107,7 +116,7 @@ export async function activeSession(client: any, token: string, userId: string) 
   return result.data;
 }
 
-export async function requireUser(req: any, res: any, adminOnly = false) {
+export async function requireUser(req: any, res: any, adminOnly = false, allowMfaChallenge = false) {
   if (!assertSameOrigin(req, res)) return null;
   const token = readCookies(req).sbmj_access;
   if (!token || token.length > 12_000) {
@@ -134,7 +143,11 @@ export async function requireUser(req: any, res: any, adminOnly = false) {
     reply(res, 403, { error: 'Acces reserve a un administrateur.' });
     return null;
   }
-  return { client, profile: profile.data, token, session };
+  const verifiedProfile = sessionProfile(profile.data, auth.data.user, token);
+  if (verifiedProfile.mfaRequired && !allowMfaChallenge) {
+    reply(res, 403, { error: 'MFA_REQUIRED' }); return null;
+  }
+  return { client, profile: verifiedProfile, token, session };
 }
 
 export async function setSession(req: any, res: any, session: any) {
@@ -153,6 +166,7 @@ export async function issueVerifiedSession(req: any, res: any, email: string, ex
   const auth = await client.auth.verifyOtp({ type: 'email', token_hash: link.data.properties.hashed_token });
   if (auth.error || !auth.data.session || auth.data.user?.id !== expectedUserId) throw new Error('Invalid authentication identity');
   await setSession(req, res, auth.data.session);
+  return auth.data.session;
 }
 
 export function newCode() {
@@ -222,7 +236,7 @@ const settingNames = new Set([
   'homepageHeroTitle', 'homepageHeroTitleEn', 'homepageHeroSubtitle', 'homepageHeroSubtitleEn',
   'homepageHeroImage1', 'homepageHeroImage2', 'homepageHeroImage3', 'storyTitleFr', 'storyTitleEn',
   'storyDescFr', 'storyDescEn', 'storyImage', 'announcementText', 'announcementTextEn',
-  'whatsappContact', 'taxRate', 'aboutTitle', 'aboutTitleEn', 'aboutContent', 'aboutContentEn',
+  'whatsappContact', 'taxRate', 'seoIndexable', 'aboutTitle', 'aboutTitleEn', 'aboutContent', 'aboutContentEn',
   'contactTitle', 'contactTitleEn', 'contactAddress', 'contactAddressEn', 'googleMapEmbedUrl',
   'careTitle', 'careTitleEn', 'careContent', 'careContentEn', 'footerText', 'footerTextEn',
   'footerCredits', 'footerCreditsEn', 'instagramUrl', 'facebookUrl', 'whatsappUrl', 'faqsJson',
