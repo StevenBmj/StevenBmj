@@ -5,117 +5,110 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Sparkles, ShieldCheck, Award, Heart, Shield } from 'lucide-react';
+import { Sparkles, Target, Map, Users, Store } from 'lucide-react';
 
 export default function AboutUs() {
-  const { language, settings } = useApp();
+  const { language } = useApp();
 
-  const titleFr = settings?.aboutTitle || "MAISON STEVENBMJ — L'OR ET LA COMPLICATION";
-  const titleEn = settings?.aboutTitleEn || "MAISON STEVENBMJ — RAW PRECIOUS MASS & COMPLICATIONS";
-  const contentFr = settings?.aboutContent || "Fondée sur le principe de la souveraineté esthétique absolue, la Maison StevenBmj fusionne l'artisanat milanais avec l'ingénierie horlogère suisse de pointe. Chaque pièce de notre catalogue est sculptée dans des matières nobles : or pur 24K, diamants rutilants de pureté VVS1, et cuirs au tannage minéral d'exception.";
-  const contentEn = settings?.aboutContentEn || "Founded on the principle of absolute aesthetic sovereignty, Maison StevenBmj fuses Milanese sartorial mastery with top-tier Swiss watchmaking. Every single piece in our vault is meticulously carved out of pristine elements: raw 24K gold, blazing VVS1 diamonds, and hand-tanned grade-A full grain leathers.";
-
-  const activeTitle = language === 'FR' ? titleFr : titleEn;
-  const activeContent = language === 'FR' ? contentFr : contentEn;
+  const fr = language === 'FR';
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 text-left" id="about-us-view">
-      
-      {/* Visual Header Grid banner with premium badge */}
-      <div className="border-b border-white/5 pb-8 mb-16">
+      <div className="border-b border-white/5 pb-8 mb-14">
         <div className="flex items-center space-x-2 text-amber-500 mb-2">
-          <Sparkles className="w-4 h-4 text-amber-500 stroke-1" />
-          <span className="text-[10px] font-mono tracking-[0.3em] uppercase block">
-            {language === 'FR' ? "L'HERITAGE DE PRESTIGE" : "LEGACY OF EXCELLENCE"}
+          <Sparkles className="w-4 h-4 stroke-1" />
+          <span className="text-[10px] font-mono tracking-[0.3em] uppercase">
+            {fr ? "IDENTITÉ & VISION" : "IDENTITY & VISION"}
           </span>
         </div>
-        <h1 className="text-3xl md:text-5xl font-light text-white tracking-widest uppercase mt-2 font-sans md:leading-tight">
-          {activeTitle}
+        <h1 className="text-3xl md:text-5xl font-light text-white tracking-widest uppercase mt-2 md:leading-tight">
+          {fr ? "STEVENBMJ — STYLE MASCULIN PREMIUM" : "STEVENBMJ — PREMIUM MEN'S STYLE"}
         </h1>
-        <p className="text-xs text-neutral-500 max-w-2xl mt-3 leading-relaxed">
-          {language === 'FR'
-            ? "Découvrez l’univers intemporel d’un couturier et orfèvre d’exception. Une fusion éternelle de technique brute et d’élégance souveraine."
-            : "Explore the timeless universe of a bespoke tailor and master goldsmith. A sovereign fusion of technology, rare matter, and elegance."}
+        <p className="text-sm text-neutral-400 max-w-3xl mt-4 leading-relaxed">
+          {fr
+            ? "StevenBmj est une marque béninoise dédiée à l'univers du style masculin. Notre sélection réunit mode, montres, chaussures et accessoires avec une même exigence : proposer une expérience cohérente, élégante et accessible."
+            : "StevenBmj is a Beninese brand dedicated to men's style. Our selection brings together fashion, watches, footwear and accessories with one ambition: a coherent, elegant and accessible customer experience."}
         </p>
       </div>
 
-      {/* Main Story Narrative and Visual Bento Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        
-        {/* Left Hand: High prestige story text box */}
-        <div className="lg:col-span-7 space-y-8 bg-neutral-950/40 p-8 rounded-lg border border-white/5 backdrop-blur-sm">
-          <div className="space-y-4">
-            <h2 className="text-lg font-light tracking-widest uppercase text-white font-sans">
-              {language === 'FR' ? "NOTRE MANIFESTE" : "OUR MANIFESTO"}
-            </h2>
-            <div className="w-12 h-[1px] bg-amber-500" />
-          </div>
-          <p className="text-sm font-light leading-relaxed text-neutral-300 font-sans whitespace-pre-wrap">
-            {activeContent}
-          </p>
-          <p className="text-xs font-mono text-neutral-500 leading-relaxed uppercase">
-            {language === 'FR'
-              ? "* Chaque modèle est numéroté, estampillé du poinçon de la Maison StevenBmj et accompagné de son certificat d'authenticité numérique sécurisé."
-              : "* Every model is individually numbered, hand-punched with the StevenBmj seal, and issued a secure digital authentication record."}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-14">
+        <div className="bg-neutral-950/50 border border-white/5 rounded-lg p-8 space-y-5">
+          <Target className="w-6 h-6 text-amber-500 stroke-1" />
+          <h2 className="text-lg font-light tracking-widest uppercase text-white">
+            {fr ? "NOTRE POSITIONNEMENT" : "OUR POSITIONING"}
+          </h2>
+          <p className="text-sm text-neutral-300 leading-relaxed">
+            {fr
+              ? "Nous construisons StevenBmj comme une marque de style masculin premium : une sélection de pièces et d'accessoires pensée pour permettre au client de composer une allure complète, du détail à la tenue."
+              : "We are building StevenBmj as a premium men's style brand: a curated selection of fashion and accessories designed to help customers build a complete look, from detail to outfit."}
           </p>
         </div>
 
-        {/* Right Hand: Bento stats boxes */}
-        <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          
-          <div className="bg-neutral-950 p-6 rounded-lg border border-white/5 space-y-2">
-            <ShieldCheck className="w-6 h-6 text-amber-500 stroke-1" />
-            <p className="text-2xl font-light font-sans text-white">100%</p>
-            <p className="text-[10px] uppercase font-mono tracking-wider text-neutral-500">
-              {language === 'FR' ? "Matières Nobles Certifiées" : "Certified Pure Materials"}
-            </p>
-          </div>
-
-          <div className="bg-neutral-950 p-6 rounded-lg border border-white/5 space-y-2">
-            <Award className="w-6 h-6 text-amber-500 stroke-1" />
-            <p className="text-2xl font-light font-sans text-white">24 Mois</p>
-            <p className="text-[10px] uppercase font-mono tracking-wider text-neutral-500">
-              {language === 'FR' ? "Garantie de Manufacture Suisse" : "Swiss Manufacture Warranty"}
-            </p>
-          </div>
-
-          <div className="bg-neutral-950 p-6 rounded-lg border border-white/5 space-y-2">
-            <Heart className="w-6 h-6 text-amber-500 stroke-1" />
-            <p className="text-2xl font-light font-sans text-white">12,500+</p>
-            <p className="text-[10px] uppercase font-mono tracking-wider text-neutral-500">
-              {language === 'FR' ? "Membres Élite VIP Actifs" : "Elite VIP Members Satisfied"}
-            </p>
-          </div>
-
-          <div className="bg-neutral-950 p-6 rounded-lg border border-white/5 space-y-2">
-            <Shield className="w-6 h-6 text-amber-500 stroke-1" />
-            <p className="text-2xl font-light font-sans text-white">3 Ateliers</p>
-            <p className="text-[10px] uppercase font-mono tracking-wider text-neutral-500">
-              Paris • Cotonou • Genève
-            </p>
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* Core Values banner block */}
-      <div className="bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-950 border border-amber-500/20 p-8 rounded-lg mt-16 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
-        {/* Subtle background glow */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl pointer-events-none" />
-        <div className="space-y-2">
-          <p className="text-xs font-mono text-amber-500 font-bold uppercase tracking-widest flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-            {language === 'FR' ? "L'OR, LA MATIÈRE SOUVERAINE" : "GOLD, THE SOVEREIGN MATTER"}
-          </p>
-          <p className="text-sm font-light text-neutral-300 max-w-4xl leading-relaxed">
-            {language === 'FR'
-              ? "StevenBmj ne conçoit pas seulement des vêtements et garde-temps. Nous sculptons votre souveraineté esthétique. Chaque maillon de nos chaînes 24k et chaque composant de nos tourbillons mécaniques portent la signature d'une ingénierie d'élites, alliant l'arrogance de l'or pur à la rigueur de l'orfèvrerie éternelle."
-              : "StevenBmj does not merely curate apparel and watches. We sculpt your aesthetic sovereignty. Every single link in our 24k chains and each gear in our mechanical tourbillons holds the signature of elite engineering, fusing raw gold boldness with Swiss precision."}
+        <div className="bg-neutral-950/50 border border-white/5 rounded-lg p-8 space-y-5">
+          <Map className="w-6 h-6 text-amber-500 stroke-1" />
+          <h2 className="text-lg font-light tracking-widest uppercase text-white">
+            {fr ? "NOTRE AMBITION" : "OUR AMBITION"}
+          </h2>
+          <p className="text-sm text-neutral-300 leading-relaxed">
+            {fr
+              ? "Structurer la marque au Bénin, renforcer ses opérations, son expérience client et son identité, puis préparer une expansion disciplinée vers d'autres villes et marchés d'Afrique de l'Ouest."
+              : "Strengthen the brand in Benin, standardize operations and customer experience, then prepare disciplined expansion into other cities and West African markets."}
           </p>
         </div>
       </div>
 
+      <div className="border border-amber-500/20 bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-950 rounded-lg p-8 mb-14">
+        <div className="flex items-center gap-3 mb-5">
+          <Store className="w-5 h-5 text-amber-500 stroke-1" />
+          <h2 className="text-lg font-light tracking-widest uppercase text-white">
+            {fr ? "DÉVELOPPEMENT & PARTENARIATS" : "EXPANSION & PARTNERSHIPS"}
+          </h2>
+        </div>
+        <p className="text-sm text-neutral-300 leading-relaxed max-w-4xl">
+          {fr
+            ? "StevenBmj est actuellement en phase de structuration et d'étude de son futur modèle d'expansion. Nous échangeons avec des professionnels du retail, des partenaires et des réseaux expérimentés afin de standardiser l'approvisionnement, le merchandising, le digital, la gestion du stock et l'expérience de marque avant toute réplication du concept."
+            : "StevenBmj is currently structuring and studying its future expansion model. We are engaging with retail professionals, partners and experienced networks to standardize sourcing, merchandising, digital operations, inventory management and brand experience before replicating the concept."}
+        </p>
+        <p className="text-xs text-amber-400 mt-5 font-mono uppercase tracking-widest">
+          {fr ? "BÉNIN → AFRIQUE DE L'OUEST" : "BENIN → WEST AFRICA"}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[
+          {
+            icon: <Sparkles className="w-5 h-5 text-amber-500 stroke-1" />,
+            titleFr: "ÉLÉGANCE",
+            titleEn: "ELEGANCE",
+            bodyFr: "Une identité visuelle forte et une sélection cohérente.",
+            bodyEn: "A strong visual identity and a coherent selection."
+          },
+          {
+            icon: <Users className="w-5 h-5 text-amber-500 stroke-1" />,
+            titleFr: "SERVICE",
+            titleEn: "SERVICE",
+            bodyFr: "Une relation client directe, attentive et durable.",
+            bodyEn: "A direct, attentive and lasting customer relationship."
+          },
+          {
+            icon: <Store className="w-5 h-5 text-amber-500 stroke-1" />,
+            titleFr: "STRUCTURATION",
+            titleEn: "STRUCTURE",
+            bodyFr: "Des processus simples, mesurables et reproductibles avant l'expansion.",
+            bodyEn: "Simple, measurable and repeatable processes before expansion."
+          }
+        ].map((item) => (
+          <div key={item.titleFr} className="bg-neutral-950 p-6 rounded-lg border border-white/5 space-y-3">
+            {item.icon}
+            <h3 className="text-sm text-white font-mono uppercase tracking-widest">
+              {fr ? item.titleFr : item.titleEn}
+            </h3>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              {fr ? item.bodyFr : item.bodyEn}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
