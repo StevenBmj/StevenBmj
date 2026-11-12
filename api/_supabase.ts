@@ -45,6 +45,9 @@ export async function sendEmail(to: string, subject: string, html: string) {
   if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
   const nodemailer = (await import('nodemailer')).default;
   const transporter = nodemailer.createTransport({
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     service: 'gmail',
     host: 'smtp.gmail.com',
     port: 465,

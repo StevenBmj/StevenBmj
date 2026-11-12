@@ -5,8 +5,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { apiFetch as fetch } from '../lib/api';
 import { Product, Order, PromoCode, AppSettings } from '../types';
 import Logo from './Logo';
+import InvoicePreview from './InvoicePreview';
+import AssistantSettings from './AssistantSettings';
+import SalesReports from './SalesReports';
+import type { InvoiceFile } from '../lib/invoicePdf';
 import { 
   BarChart, Sparkles, Plus, Edit2, Trash2, Tag, Percent, 
   Settings, Search, RefreshCw, Layers, ShieldAlert, Users, 
@@ -15,45 +20,31 @@ import {
 } from 'lucide-react';
 
 export default function GodDashboard() {
-  const { language, formatPrice, user, setUser, fetchProducts, fetchSettings } = useApp();
+  const { language, formatPrice, user, setUser, logout, authLoading, setAuthModalOpen, fetchProducts, fetchSettings } = useApp();
   
   // Tabs of "God" dashboard
-  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'orders' | 'promos' | 'users' | 'settings' | 'security' | 'announcements' | 'reviews'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'orders' | 'promos' | 'users' | 'settings' | 'security' | 'announcements' | 'reviews' | 'assistants'>('analytics');
   
   // Security authentications
-  const [isAuthorized, setIsAuthorized] = useState(() => {
-    const isSessionAuth = sessionStorage.getItem('sbmj_admin_auth') === 'true';
-    return isSessionAuth;
-  });
+  const isAuthorized = user?.isAdmin === true;
+  const [loginLoading, setLoginLoading] = useState(false);
   
   const [adminUsername, setAdminUsername] = useState('');
   const [adminLoginPassword, setAdminLoginPassword] = useState('');
   const [showAdminLoginPassword, setShowAdminLoginPassword] = useState(false);
   const [showAdminRecoverPassword, setShowAdminRecoverPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const [showGoogleSim, setShowGoogleSim] = useState(false);
-
-  // Sync authorization with global user state
-  useEffect(() => {
-    if (user && user.isAdmin) {
-      setIsAuthorized(true);
-      sessionStorage.setItem('sbmj_admin_auth', 'true');
-    } else {
-      setIsAuthorized(false);
-      sessionStorage.removeItem('sbmj_admin_auth');
-    }
-  }, [user]);
 
   // Notifications system per administrative section
   const [sectionNotifications, setSectionNotifications] = useState<{ [key: string]: number }>({
-    analytics: 3,
-    products: 1,
-    orders: 2,
+    analytics: 0,
+    products: 0,
+    orders: 0,
     promos: 0,
-    users: 4,
+    users: 0,
     settings: 0,
-    security: 5,
-    announcements: 1,
+    security: 0,
+    announcements: 0,
     reviews: 0,
   });
 
@@ -86,10 +77,6 @@ export default function GodDashboard() {
   const [vipMsgError, setVipMsgError] = useState('');
   const [vipMsgLoading, setVipMsgLoading] = useState(false);
 
-  // Analytics filter state
-  const [analyticsFilter, setAnalyticsFilter] = useState<'week' | 'month' | 'year'>('week');
-  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Form states for Product management
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -103,6 +90,7 @@ export default function GodDashboard() {
   // Invoice / Order Search State
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any | null>(null);
+  const [adminInvoiceFile, setAdminInvoiceFile] = useState<InvoiceFile | null>(null);
 
   // Security LOG Search States
   const [logSearchQuery, setLogSearchQuery] = useState('');
@@ -169,7 +157,6 @@ export default function GodDashboard() {
           contactAddress: "Avenue du Prestige, Quartier Akpakpa, Cotonou, Bénin. (En face de la Zone Résidentielle)",
           contactAddressEn: "Prestige Avenue, Akpakpa District, Cotonou, Benin. (Opposite the Residential Enclave)",
           googleMapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3972.482701053427!2d2.463388!3d6.360155!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x102355db7cb9b51%3A0xbc78051743e47fdc!2sAkpakpa%2C%20Cotonou!5e0!3m2!1sfr!2sbj!4v1700000000000",
-          adminPassword: "stevenbmj123",
           careTitle: "ATELIER CARE & SOUVERAINETÉ",
           careTitleEn: "ATELIER SOUVERAIN CARE",
           careContent: "Une question sur une taille, un ajustement sur-mesure ou une commande haute couture ? Notre service de conciergerie privée vous répond sous 15 minutes, 24/7.",
@@ -264,26 +251,9 @@ export default function GodDashboard() {
   }, [reviewsList]);
 
   useEffect(() => {
-    fetchAllGodData();
-  }, []);
+    if (isAuthorized) void fetchAllGodData();
+  }, [isAuthorized]);
 
-  // Hydrate Analytics charts
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      setAnalyticsLoading(true);
-      try {
-        const res = await fetch(`/api/analytics?filter=${analyticsFilter}`);
-        if (res.ok) {
-          setAnalyticsData(await res.json());
-        }
-      } catch (err) {
-        console.error("Failed to fetch analytics", err);
-      } finally {
-        setAnalyticsLoading(false);
-      }
-    };
-    fetchAnalytics();
-  }, [analyticsFilter]);
 
   // Handle order status updates
   const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
@@ -301,116 +271,12 @@ export default function GodDashboard() {
     }
   };
 
-  const handlePrintInvoice = (order: any) => {
-    if (!order) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Veuillez autoriser les fenêtres contextuelles (popups) pour imprimer la facture.");
-      return;
-    }
-    
-    const invoiceHtml = `
-      <html>
-        <head>
-          <title>Facture StevenBmj - Reference: ${order.id}</title>
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-          <style>
-            body { background-color: #ffffff; color: #121212; font-family: sans-serif; padding: 40px; }
-            .print-container { max-width: 800px; margin: 0 auto; border: 4px double #d97706; padding: 30px; border-radius: 8px; }
-            .font-mono { font-family: monospace; }
-          </style>
-        </head>
-        <body>
-          <div class="print-container">
-            <div class="flex justify-between items-center border-b border-yellow-600 pb-6 mb-6">
-              <div class="flex items-center space-x-3" style="display: flex; align-items: center;">
-                <img src="/logo.png" alt="StevenBmj" width="60" height="60" style="width:60px;height:60px;border-radius:9999px;object-fit:cover;" />
-                <div style="text-align: left; margin-left: 10px;">
-                  <div style="font-size: 24px; color: #b45309; font-weight: 300; letter-spacing: 0.25em; font-family: sans-serif; text-transform: uppercase; line-height: 1;">StevenBmj</div>
-                  <div style="font-size: 7px; color: #4b5563; font-weight: 600; letter-spacing: 0.35em; font-family: monospace; text-transform: uppercase; margin-top: 3px;">HAUTE COUTURE & JOAILLERIE</div>
-                </div>
-              </div>
-              <div class="text-right text-xs font-mono">
-                <p class="font-bold text-red-600 text-sm">REÇU DE FACTURATION ACQUITTÉ</p>
-                <p>RÉF: ${order.id}</p>
-                <p>DATE: ${new Date(order.date).toLocaleDateString('fr-FR')}</p>
-              </div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-6 text-xs mb-6 pb-6 border-b border-gray-200">
-              <div>
-                <h3 class="text-[#d97706] font-bold uppercase mb-2 font-mono">Destinataire VIP</h3>
-                <p class="font-bold uppercase text-sm">${order.customerName}</p>
-                <p>WhatsApp: ${order.whatsapp}</p>
-                <p>Adresse: ${order.address}, ${order.city}</p>
-                ${order.notes ? `<p class="italic text-gray-500 mt-2">Notes d'atelier: ${order.notes}</p>` : ''}
-              </div>
-              <div class="text-right">
-                <h3 class="text-gray-500 font-bold uppercase mb-2 font-mono">Maison E-Commerce</h3>
-                <p class="font-bold">StevenBmj East Africa SARL</p>
-                <p>Siège Cotonou, Bénin</p>
-                <p>Avenue du Prestige, Akpakpa</p>
-                <p class="font-mono">Concierge: +22955468138</p>
-              </div>
-            </div>
-
-            <table class="w-full text-left text-xs mb-6 border-collapse">
-              <thead>
-                <tr class="border-b border-yellow-600 font-mono text-gray-700">
-                  <th class="pb-3 text-left">SÉLECTION / CRÉATION</th>
-                  <th class="pb-3 text-center">QUANTITÉ</th>
-                  <th class="pb-3 text-right">PRIX UNITAIRE</th>
-                  <th class="pb-3 text-right">MONTANT TOTAL</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100 font-mono text-xs">
-                ${order.items.map((item: any) => `
-                  <tr>
-                    <td class="py-4">
-                      <p class="font-sans font-bold text-sm">${item.productName}</p>
-                      ${item.selectedSize ? `<p class="text-[10px] text-yellow-700">Taille: ${item.selectedSize}</p>` : ''}
-                    </td>
-                    <td class="py-4 text-center">${item.quantity}</td>
-                    <td class="py-4 text-right">${item.price.toLocaleString('fr-FR')} €</td>
-                    <td class="py-4 text-right font-bold">${(item.price * item.quantity).toLocaleString('fr-FR')} €</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <div class="flex justify-between items-center border-t border-yellow-600 pt-6">
-              <div class="flex items-center space-x-4">
-                <img
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=121212&bgcolor=ffffff&data=${encodeURIComponent(
-                    `REÇU SOUVERAIN N° ${order.id}\nCLIENT: ${order.customerName}\nTOTAL: ${order.totalPrice.toLocaleString('fr-FR')} EUR\nSTEVENBMJ AUTHENTICITY GUARANTEED`
-                  )}"
-                  class="w-16 h-16 object-contain"
-                />
-                <div class="text-left font-mono">
-                  <p class="text-[9px] text-[#d97706] font-bold">CERTIFICAT SBMJ</p>
-                  <p class="text-[8px] text-gray-500 leading-tight">Cet achat est scellé sous le label de prestige StevenBmj.</p>
-                </div>
-              </div>
-              <div class="text-right font-mono">
-                <p class="text-xs text-gray-500 font-bold">LIVRAISON PRIVÉE SBMJ : <span class="text-green-600 font-bold">INCLUSE</span></p>
-                <p class="text-sm mt-1">MONTANT PAYÉ APPRÉCIÉ :</p>
-                <p class="text-xl font-bold text-yellow-600">${order.totalPrice.toLocaleString('fr-FR')} €</p>
-              </div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 400);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-    
-    printWindow.document.write(invoiceHtml);
-    printWindow.document.close();
+  const handlePrintInvoice = (_order: any) => {
+    if (!adminInvoiceFile || adminInvoiceFile.orderId !== selectedOrderForInvoice?.id || adminInvoiceFile.language !== language) return;
+    const link = document.createElement('a');
+    link.href = adminInvoiceFile.url;
+    link.download = adminInvoiceFile.filename;
+    link.click();
   };
 
   // Create Product Submit handler
@@ -756,203 +622,24 @@ export default function GodDashboard() {
     }
   };
 
-  // SVG Chart Render Helper: Graphique 1: Évolution financière (Ventes, Bénéfices, Revenus, Pertes)
-  const drawFinancialChartSvg = useMemo(() => {
-    if (!analyticsData || analyticsData.length === 0) return null;
-    
-    const svgWidth = 600;
-    const svgHeight = 220;
-    const padding = 40;
-    const graphWidth = svgWidth - padding * 2;
-    const graphHeight = svgHeight - padding * 2;
 
-    const maxVal = Math.max(...analyticsData.map(d => Math.max(d.ventes, d.revenus, d.benefices)), 1000) * 1.1;
-    const pointX = (i: number) => padding + (analyticsData.length <= 1 ? graphWidth / 2 : (i / (analyticsData.length - 1)) * graphWidth);
-
-    const pointsVentes = analyticsData.map((d, i) => {
-      const x = pointX(i);
-      const y = svgHeight - padding - (d.ventes / maxVal) * graphHeight;
-      return `${x},${y}`;
-    }).join(' ');
-
-    const pointsBenefices = analyticsData.map((d, i) => {
-      const x = pointX(i);
-      const y = svgHeight - padding - (d.benefices / maxVal) * graphHeight;
-      return `${x},${y}`;
-    }).join(' ');
-
-    return (
-      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full">
-        {/* Grids background */}
-        <g stroke="#ffffff" strokeOpacity="0.05" strokeWidth="1">
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => (
-            <line 
-              key={idx} 
-              x1={padding} 
-              y1={padding + ratio * graphHeight} 
-              x2={svgWidth - padding} 
-              y2={padding + ratio * graphHeight} 
-            />
-          ))}
-        </g>
-
-        {/* Financial Lines */}
-        {/* Ventes line: Golden */}
-        <polyline
-          fill="none"
-          stroke="#D97706"
-          strokeWidth="3.5"
-          points={pointsVentes}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Benefices: Green emerald */}
-        <polyline
-          fill="none"
-          stroke="#10B981"
-          strokeWidth="2.5"
-          points={pointsBenefices}
-          strokeDasharray="4 2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Data points pins glowing */}
-        {analyticsData.map((d, i) => {
-          const x = pointX(i);
-          const y = svgHeight - padding - (d.ventes / maxVal) * graphHeight;
-          return (
-            <g key={i} className="group cursor-help">
-              <circle cx={x} cy={y} r="5" fill="#D97706" />
-              <circle cx={x} cy={y} r="10" fill="#D97706" opacity="0.15" />
-              <title>{`${d.name}: Ventes ${formatPrice(d.ventes)} / Bénéfice ${formatPrice(d.benefices)}`}</title>
-            </g>
-          );
-        })}
-
-        {/* Axes labels */}
-        <text x={padding} y={svgHeight - 15} fill="#666" fontSize="9" fontFamily="monospace">DEB</text>
-        <text x={svgWidth - padding} y={svgHeight - 15} fill="#666" fontSize="9" fontFamily="monospace" textAnchor="end">FIN</text>
-        <text x={padding - 5} y={padding + 5} fill="#666" fontSize="9" fontFamily="monospace" textAnchor="end">{formatPrice(maxVal)}</text>
-      </svg>
-    );
-  }, [analyticsData, analyticsFilter]);
-
-  // SVG Chart Render Helper: Graphique 2: Visiteurs, Clics, Conversions
-  const drawTrafficChartSvg = useMemo(() => {
-    if (!analyticsData || analyticsData.length === 0) return null;
-    
-    const svgWidth = 600;
-    const svgHeight = 220;
-    const padding = 40;
-    const graphWidth = svgWidth - padding * 2;
-    const graphHeight = svgHeight - padding * 2;
-
-    const maxVal = Math.max(...analyticsData.map(d => Math.max(d.visiteurs, d.clics)), 100) * 1.1;
-    const pointX = (i: number) => padding + (analyticsData.length <= 1 ? graphWidth / 2 : (i / (analyticsData.length - 1)) * graphWidth);
-
-    const pointsVisiteurs = analyticsData.map((d, i) => {
-      const x = pointX(i);
-      const y = svgHeight - padding - (d.visiteurs / maxVal) * graphHeight;
-      return `${x},${y}`;
-    }).join(' ');
-
-    const pointsClics = analyticsData.map((d, i) => {
-      const x = pointX(i);
-      const y = svgHeight - padding - (d.clics / maxVal) * graphHeight;
-      return `${x},${y}`;
-    }).join(' ');
-
-    return (
-      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full">
-        {/* Grids */}
-        <g stroke="#ffffff" strokeOpacity="0.05" strokeWidth="1">
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => (
-            <line 
-              key={idx} 
-              x1={padding} 
-              y1={padding + ratio * graphHeight} 
-              x2={svgWidth - padding} 
-              y2={padding + ratio * graphHeight} 
-            />
-          ))}
-        </g>
-
-        {/* Traffic Line: Space Cyber Purple/White */}
-        <polyline
-          fill="none"
-          stroke="#6366F1"
-          strokeWidth="3.5"
-          points={pointsVisiteurs}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polyline
-          fill="none"
-          stroke="#38BDF8"
-          strokeWidth="2"
-          points={pointsClics}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Data points pins */}
-        {analyticsData.map((d, i) => {
-          const x = pointX(i);
-          const y = svgHeight - padding - (d.visiteurs / maxVal) * graphHeight;
-          return (
-            <g key={i} className="group cursor-help">
-              <circle cx={x} cy={y} r="5" fill="#6366F1" />
-              <title>{`${d.name}: ${d.visiteurs} Visiteurs / Conversion ${d.conversion}%`}</title>
-            </g>
-          );
-        })}
-
-        {/* Labels */}
-        <text x={padding} y={svgHeight - 15} fill="#666" fontSize="9" fontFamily="monospace">DEB</text>
-        <text x={svgWidth - padding} y={svgHeight - 15} fill="#666" fontSize="9" fontFamily="monospace" textAnchor="end">FIN</text>
-        <text x={padding - 5} y={padding + 5} fill="#666" fontSize="9" fontFamily="monospace" textAnchor="end">{maxVal.toFixed(0)}</text>
-      </svg>
-    );
-  }, [analyticsData, analyticsFilter]);
-
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const correctPassword = settings?.adminPassword || "stevenbmj123";
-    const userEmail = adminUsername.trim().toLowerCase();
-    
-    if (userEmail === 'stevenamorin202@gmail.com' && adminLoginPassword === correctPassword) {
-      sessionStorage.setItem('sbmj_admin_auth', 'true');
-      setIsAuthorized(true);
-      setLoginError('');
-      setUser({
-        id: 'admin',
-        name: "StevenBmj Admin",
-        email: "stevenamorin202@gmail.com",
-        isAdmin: true,
-        vipPoints: 99999
+    if (loginLoading) return;
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminUsername.trim().toLowerCase(), password: adminLoginPassword }),
       });
-    } else {
-      setLoginError(language === 'FR' ? "Identifiants administratifs incorrects. (Seul 'stevenamorin202@gmail.com' est autorisé)" : "Incorrect administrative credentials. (Only 'stevenamorin202@gmail.com' is accredited)");
-    }
-  };
-
-  const handleAdminGoogleLogin = (emailStr: string) => {
-    if (emailStr.trim().toLowerCase() === 'stevenamorin202@gmail.com') {
-      sessionStorage.setItem('sbmj_admin_auth', 'true');
-      setIsAuthorized(true);
-      setLoginError('');
-      setUser({
-        id: 'admin',
-        name: "StevenBmj Admin",
-        email: "stevenamorin202@gmail.com",
-        isAdmin: true,
-        vipPoints: 99999
-      });
-      setShowGoogleSim(false);
-    } else {
-      setLoginError(language === 'FR' ? "Ce compte Google n'a pas les droits d'administration." : "This Google account lacks admin accreditation.");
-    }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Connexion refusee.');
+      setUser(data.user);
+      setAdminLoginPassword('');
+      if (!data.user?.isAdmin) throw new Error(language === 'FR' ? 'Ce compte ne dispose pas des droits administrateur.' : 'This account is not an administrator.');
+    } catch (error: any) { setLoginError(error.message || 'Connexion impossible.'); }
+    finally { setLoginLoading(false); }
   };
 
   const sendAdminSecurityCode = async () => {
@@ -961,10 +648,6 @@ export default function GodDashboard() {
     const targetEmail = recoverEmail.trim().toLowerCase();
     if (!targetEmail) {
       setLoginError(language === 'FR' ? "Veuillez d'abord saisir l'adresse e-mail." : "Please input email first.");
-      return;
-    }
-    if (targetEmail !== 'stevenamorin202@gmail.com') {
-      setLoginError(language === 'FR' ? "Identifiant interdit." : "Disallowed email identity.");
       return;
     }
     try {
@@ -990,10 +673,6 @@ export default function GodDashboard() {
     setRecoverSuccessMsg('');
 
     const targetEmail = recoverEmail.trim().toLowerCase();
-    if (targetEmail !== 'stevenamorin202@gmail.com') {
-      setLoginError(language === 'FR' ? "Droit de modification refusé. Seul 'stevenamorin202@gmail.com' peut modifier le mot de passe." : "Override denied. Only 'stevenamorin202@gmail.com' can modify the administrative password.");
-      return;
-    }
 
     try {
       const res = await fetch('/api/auth/admin/change-password', {
@@ -1004,9 +683,7 @@ export default function GodDashboard() {
       const data = await res.json();
       if (res.ok) {
         setRecoverSuccessMsg(language === 'FR' ? "Le nouveau mot de passe a été programmé avec succès !" : "New secret passcode was successfully overwrote!");
-        if (settings) {
-          setSettings({ ...settings, adminPassword: recoverNewPassword });
-        }
+        setUser(null);
         setRecoverNewPassword('');
         setAdminSecurityCode('');
         setAdminCodeSentFeedback('');
@@ -1134,52 +811,6 @@ export default function GodDashboard() {
                 {language === 'FR' ? "Retourner à l'authentification" : "Return to Credentials"}
               </button>
             </form>
-          ) : showGoogleSim ? (
-            <div className="space-y-4 py-4 animate-fade-in">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-2">
-                <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                  {language === 'FR' ? "Comptes Google Détectés" : "Detected Google Accounts"}
-                </span>
-              </div>
-              
-              <div className="space-y-2">
-                <button
-                  id="btn-admin-google-select-real"
-                  onClick={() => handleAdminGoogleLogin('stevenamorin202@gmail.com')}
-                  className="w-full p-3 bg-neutral-900 border border-white/10 hover:border-red-500/50 rounded flex items-center gap-3 text-left hover:bg-neutral-900/60 duration-200 cursor-pointer"
-                >
-                  <div className="w-8 h-8 rounded-full bg-red-950/20 border border-red-500/30 text-red-500 font-mono font-bold flex items-center justify-center text-xs shrink-0">
-                    SA
-                  </div>
-                  <div>
-                    <h4 className="text-xs text-white font-semibold leading-none">Steven Amorin</h4>
-                    <span className="text-[10px] text-neutral-500 font-mono">stevenamorin202@gmail.com</span>
-                  </div>
-                </button>
-
-                <button
-                  id="btn-admin-google-select-wrong"
-                  onClick={() => handleAdminGoogleLogin('wrong@example.com')}
-                  className="w-full p-3 bg-neutral-900 border border-white/10 hover:border-red-500/50 rounded flex items-center gap-3 text-left hover:bg-neutral-900/60 duration-200 cursor-pointer opacity-50"
-                >
-                  <div className="w-8 h-8 rounded-full bg-neutral-800 border border-white/10 text-neutral-400 font-mono flex items-center justify-center text-xs shrink-0">
-                    UK
-                  </div>
-                  <div>
-                    <h4 className="text-xs text-white font-semibold leading-none">Unknown Intruder</h4>
-                    <span className="text-[10px] text-neutral-500 font-mono">unknown@example.com</span>
-                  </div>
-                </button>
-              </div>
-
-              <button
-                id="btn-admin-cancel-google"
-                onClick={() => setShowGoogleSim(false)}
-                className="w-full py-2 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white rounded font-mono text-[10px] uppercase cursor-pointer"
-              >
-                {language === 'FR' ? "Retour au formulaire classique" : "Return to credentials"}
-              </button>
-            </div>
           ) : (
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="space-y-1">
@@ -1220,6 +851,7 @@ export default function GodDashboard() {
 
               <button
                 id="btn-admin-login-submit"
+                disabled={loginLoading || authLoading}
                 type="submit"
                 className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-[10.5px] font-bold uppercase tracking-widest rounded cursor-pointer duration-300 transition-all active:scale-[0.98] text-center"
               >
@@ -1235,10 +867,7 @@ export default function GodDashboard() {
               <button
                 id="btn-admin-google-auth-trigger"
                 type="button"
-                onClick={() => {
-                  setAdminUsername('stevenamorin202@gmail.com');
-                  setShowGoogleSim(true);
-                }}
+                onClick={() => setAuthModalOpen(true)}
                 className="w-full py-3 bg-neutral-900 hover:bg-neutral-900/60 border border-white/10 text-white font-mono text-[10.5px] uppercase tracking-widest rounded cursor-pointer duration-300 transition-all flex items-center justify-center gap-2 h-11"
               >
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
@@ -1279,7 +908,7 @@ export default function GodDashboard() {
           )}
 
           <p className="text-[10px] text-center text-neutral-500 font-mono leading-relaxed uppercase">
-            * Connexion chiffrée de niveau militaire. Toute tentative d'intrusion sera consignée dans le journal de pare-feu.
+            {language === 'FR' ? 'Accès réservé aux administrateurs autorisés.' : 'Access restricted to authorized administrators.'}
           </p>
         </div>
       </div>
@@ -1293,14 +922,13 @@ export default function GodDashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b border-white/5 gap-4">
         <div>
           <div className="flex items-center space-x-2 text-red-500 mb-1">
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase font-bold">STEVENBMJ COGNITIVE CORE SECURED</span>
+            <span className="text-[10px] font-mono tracking-[0.2em] uppercase font-bold">STEVENBMJ</span>
           </div>
           <h1 className="text-3xl font-light text-white tracking-widest uppercase font-sans">
-            God Dashboard
+            {language === 'FR' ? 'Administration' : 'Administration'}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
-            Régie souveraine, pare-feu logicie-cyber, base de données isolée et monitoring d'activité d'exception.
+            {language === 'FR' ? 'Boutique, commandes et activité.' : 'Store, orders and activity.'}
           </p>
         </div>
 
@@ -1308,8 +936,8 @@ export default function GodDashboard() {
         <div className="flex items-center space-x-3 bg-neutral-900/60 p-4 border border-white/5 rounded-lg shrink-0">
           <Logo size={40} className="stroke-red-500" />
           <div className="text-left font-mono">
-            <p className="text-xs text-white font-bold tracking-widest uppercase">ROLE_GOD_SYSTEM</p>
-            <p className="text-[9px] text-neutral-500">ROOT@STEVENBMJ.SECURE</p>
+            <p className="text-xs text-white font-bold uppercase">{language === 'FR' ? 'Administrateur' : 'Administrator'}</p>
+            <p className="text-[9px] text-neutral-500 break-all">{user.email}</p>
           </div>
         </div>
       </div>
@@ -1328,6 +956,7 @@ export default function GodDashboard() {
             { id: 'users', label: 'CLIENTÈLE VIP', icon: <Users className="w-4 h-4 text-amber-400" /> },
             { id: 'reviews', label: 'AVIS CLIENTÈLE', icon: <MessageSquare className="w-4 h-4 text-emerald-400" /> },
             { id: 'settings', label: 'CONFIGURATION SITE', icon: <Settings className="w-4 h-4" /> },
+            { id: 'assistants', label: language === 'FR' ? 'ASSISTANTS & API' : 'ASSISTANTS & API', icon: <Sparkles className="w-4 h-4" /> },
             { id: 'security', label: 'CYBER PARE-FEU', icon: <ShieldAlert className="w-4 h-4" /> },
           ].map((item) => (
             <button
@@ -1361,8 +990,7 @@ export default function GodDashboard() {
           <button
             id="btn-admin-explicit-logout"
             onClick={() => {
-              setUser(null);
-              sessionStorage.removeItem('sbmj_admin_auth');
+              void logout().catch(error => alert(error.message));
             }}
             className="w-full mt-6 py-3 px-4 rounded text-xs text-left uppercase tracking-wider duration-350 cursor-pointer flex items-center text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-dashed border-red-500/20"
           >
@@ -1377,84 +1005,8 @@ export default function GodDashboard() {
         <div className="lg:col-span-4 bg-neutral-950/40 border border-white/5 rounded-lg p-6 backdrop-blur-md">
           
           {/* TAB 1: ANALYTICS PREMIUM */}
-          {activeTab === 'analytics' && (
-            <div className="space-y-8">
-              
-              {/* Analytics headers buttons */}
-              <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                  INDICATEURS FINANCIERS ET VISITES
-                </h3>
-                <div className="flex border border-white/5 rounded overflow-hidden bg-neutral-900 h-9 shrink-0">
-                  {['week', 'month', 'year'].map((filter) => (
-                    <button
-                      id={`btn-analytics-filter-${filter}`}
-                      key={filter}
-                      onClick={() => setAnalyticsFilter(filter as any)}
-                      className={`text-[9px] font-mono uppercase px-3 cursor-pointer ${
-                        analyticsFilter === filter ? 'bg-amber-400 text-black font-bold' : 'text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      {filter === 'week' ? 'Semaine' : filter === 'month' ? 'Mois' : 'Année'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3 Analytics Stat boxes */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="bg-neutral-950 p-5 rounded-lg border border-white/5 space-y-1">
-                  <span className="text-[10px] font-mono text-neutral-500 uppercase">REVENUS TOTALS CONTABILISÉS</span>
-                  <p className="text-2xl font-black font-mono text-amber-500">{formatPrice(1287650)}</p>
-                  <p className="text-[9px] text-emerald-400 font-mono">⚡ +12% vs période précédente</p>
-                </div>
-                <div className="bg-neutral-950 p-5 rounded-lg border border-white/5 space-y-1">
-                  <span className="text-[10px] font-mono text-neutral-500 uppercase">BÉNÉFICES NETS ESTIMÉS</span>
-                  <p className="text-2xl font-black font-mono text-emerald-400">{formatPrice(543800)}</p>
-                  <p className="text-[9px] text-neutral-500">Marge moyenne : 42.2% de prestige</p>
-                </div>
-                <div className="bg-neutral-950 p-5 rounded-lg border border-white/5 space-y-1">
-                  <span className="text-[10px] font-mono text-neutral-500 uppercase">TAUZE MOYEN DE CONVERSION</span>
-                  <p className="text-2xl font-black font-mono text-white">4.85 %</p>
-                  <p className="text-[9px] text-amber-500 font-mono">🌟 Standard luxe surperformé</p>
-                </div>
-              </div>
-
-              {/* Graphical grids */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                
-                {/* Graphique 1 card */}
-                <div className="bg-neutral-950 rounded-lg p-5 border border-white/10 space-y-4">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-white font-semibold">GRAPHIQUE 1 : ÉVOLUTION COMMERCIALE</span>
-                    <div className="flex gap-2">
-                      <span className="flex items-center text-[9px] text-amber-500 font-mono">● VENTES</span>
-                      <span className="flex items-center text-[9px] text-emerald-400 font-mono">○ BÉNÉFICES</span>
-                    </div>
-                  </div>
-                  <div className="h-44 flex items-center justify-center relative">
-                    {analyticsLoading ? <span className="text-xs text-neutral-500 animate-pulse">Compiling matrix...</span> : drawFinancialChartSvg}
-                  </div>
-                </div>
-
-                {/* Graphique 2 card */}
-                <div className="bg-neutral-950 rounded-lg p-5 border border-white/10 space-y-4">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-white font-semibold">GRAPHIQUE 2 : FLUX TRAFIC & INTENTIONS</span>
-                    <div className="flex gap-2">
-                      <span className="flex items-center text-[9px] text-indigo-400 font-mono">● VISITES</span>
-                      <span className="flex items-center text-[9px] text-sky-400 font-mono">○ CLICS</span>
-                    </div>
-                  </div>
-                  <div className="h-44 flex items-center justify-center relative">
-                    {analyticsLoading ? <span className="text-xs text-neutral-500 animate-pulse">Compiling streams...</span> : drawTrafficChartSvg}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
+          {activeTab === 'assistants' && <AssistantSettings />}
+          {activeTab === 'analytics' && <SalesReports />}
 
           {/* TAB 2: PRODUCTS MANAGER */}
           {activeTab === 'products' && (
@@ -3766,14 +3318,12 @@ StevenBmj - Conciergerie Royale`}
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-mono text-red-400 uppercase block">Nouveau Mot de Passe d'Accès Administratif *</label>
-                <input
-                  id="sett-admin-pass"
-                  type="text"
-                  required
-                  value={settings.adminPassword || 'stevenbmj123'}
-                  onChange={(e) => setSettings({ ...settings, adminPassword: e.target.value })}
-                  className="w-full bg-neutral-900 border border-red-500/20 text-xs px-3.5 py-3 text-white font-mono text-red-400 font-bold"
-                />
+                <button type="button" onClick={async () => {
+                  try { await logout(); setIsAdminRecoverMode(true); }
+                  catch (error: any) { alert(error.message); }
+                }} className="px-4 py-3 border border-red-500/30 text-red-400 rounded text-xs">
+                  {language === 'FR' ? 'Modifier le mot de passe' : 'Change password'}
+                </button>
               </div>
 
               <button
@@ -4041,127 +3591,16 @@ StevenBmj - Conciergerie Royale`}
                   ✕ Fermer la facture
                 </button>
 
-                {/* Print area */}
-                <div id="print-area" className="space-y-8 bg-black text-white p-4 border border-white/5 rounded">
-                  
-                  {/* The Luxury Double Border Invoice Card */}
-                  <div className="border-4 border-double border-amber-500/30 p-8 rounded bg-neutral-950 tracking-wide relative">
-                    
-                    {/* Top Row Invoice Branding header */}
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-amber-500/20 pb-6 gap-6">
-                      <div className="flex items-center space-x-3 text-left font-sans">
-                        <Logo size={50} />
-                        <div>
-                          <span className="text-2xl font-light tracking-[0.25em] text-white uppercase font-sans">StevenBmj</span>
-                          <span className="text-[8px] font-mono tracking-[0.4em] text-amber-500 block uppercase">HAUTE COUTURE ET JOAILLERIE</span>
-                        </div>
-                      </div>
-
-                      <div className="text-left md:text-right font-mono text-[10px] text-neutral-400 space-y-1">
-                        <p className="text-yellow-400 font-semibold tracking-wider uppercase text-xs">FACTURE DE PRESTIGE (ADMIN)</p>
-                        <p>FACTURE ID: {selectedOrderForInvoice.id}</p>
-                        <p>DATE D'ÉMISSION: {new Date(selectedOrderForInvoice.date).toLocaleDateString('fr-FR')}</p>
-                        <p>ATELIER: Paris / Bénin / Genève</p>
-                      </div>
-                    </div>
-
-                    {/* Buyer / Seller Details column */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8 text-xs border-b border-white/5 text-left">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block mb-1">DESTINATAIRE VIP</span>
-                        <p className="font-semibold text-white uppercase text-sm">{selectedOrderForInvoice.customerName}</p>
-                        <p className="text-neutral-400 font-mono">WhatsApp: {selectedOrderForInvoice.whatsapp}</p>
-                        <p className="text-neutral-450">{selectedOrderForInvoice.address}, {selectedOrderForInvoice.city}</p>
-                        {selectedOrderForInvoice.notes && (
-                          <p className="text-[10px] text-neutral-500 italic mt-2">Notes d'Atelier: {selectedOrderForInvoice.notes}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-1 md:text-right text-left">
-                        <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block mb-1">MAISON DE VENTES</span>
-                        <p className="font-semibold text-white">StevenBmj West Africa SARL</p>
-                        <p className="text-neutral-400">Siège Cotonou, Bénin</p>
-                        <p className="text-neutral-400 font-mono">Contact Concierge: +22955468138</p>
-                        <p className="text-neutral-500">Email: stevenbmj202@gmail.com</p>
-                      </div>
-                    </div>
-
-                    {/* Items Table */}
-                    <div className="py-6 overflow-x-auto">
-                      <table className="w-full text-left text-xs text-neutral-400 border-collapse">
-                        <thead>
-                          <tr className="border-b border-amber-500/20 text-white uppercase tracking-wider text-[10px] font-mono">
-                            <th className="py-3 pr-4">CRÉATION / SÉLECTION</th>
-                            <th className="py-3 px-4 text-center">QUANTITÉ</th>
-                            <th className="py-3 px-4 text-right">PRIX UNITAIRE</th>
-                            <th className="py-3 pl-4 text-right">MONTANT NET</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5 font-mono">
-                          {selectedOrderForInvoice.items.map((item: any, id: number) => (
-                            <tr key={id} className="hover:bg-white/5 duration-300">
-                              <td className="py-4 pr-4 font-sans text-white text-left">
-                                <span className="font-medium text-xs block">{item.productName}</span>
-                                {item.selectedSize && (
-                                  <span className="text-[9px] font-mono text-amber-500/80 uppercase">
-                                    Taille sélectionnée: {item.selectedSize}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-4 px-4 text-center text-neutral-300">{item.quantity}</td>
-                              <td className="py-4 px-4 text-right text-neutral-300">{formatPrice(item.price)}</td>
-                              <td className="py-4 pl-4 text-right text-white font-semibold">{formatPrice(item.price * item.quantity)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Calculations and Visual Signature QR Code bottom */}
-                    <div className="border-t border-amber-500/20 pt-6 flex flex-col md:flex-row md:justify-between gap-8 items-center">
-                      
-                      {/* Real interactive QR code stamp */}
-                      <div className="flex items-center space-x-4 bg-neutral-900/60 p-4 border border-white/5 rounded">
-                        <div className="w-16 h-16 bg-white p-1 rounded inline-block shrink-0 flex items-center justify-center">
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=121212&bgcolor=ffffff&data=${encodeURIComponent(
-                              `MAISON STEVENBMJ\nFacture de prestige: ${selectedOrderForInvoice.id}\nClient: ${selectedOrderForInvoice.customerName}\nTotal paye: ${selectedOrderForInvoice.totalPrice} EUR\nDate d'emission: ${new Date(selectedOrderForInvoice.date).toLocaleDateString('fr-FR')}\nAchats: ${selectedOrderForInvoice.items.map((it: any) => `${it.quantity}x ${it.productName}`).join(', ')}\nMerci de votre confiance.`
-                            )}`}
-                            alt="QR Code Facture Souveraine"
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div className="text-left font-mono">
-                          <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">CERTIFICAT D'AUTHENTICITÉ</p>
-                          <p className="text-[9px] text-neutral-500 leading-snug">Timbre unique de conciergerie. Propriété exclusive garantie.</p>
-                        </div>
-                      </div>
-
-                      <div className="text-right text-sm space-y-1.5 min-w-[15rem] font-mono text-left">
-                        <div className="flex justify-between text-neutral-500">
-                          <span>Livraison assurée :</span>
-                          <span className="text-white text-right">Inclus</span>
-                        </div>
-                        <div className="flex justify-between text-yellow-500 text-lg font-bold border-t border-white/5 pt-2">
-                          <span>TOTAL LIQUIDÉ :</span>
-                          <span className="text-right">{formatPrice(selectedOrderForInvoice.totalPrice)}</span>
-                        </div>
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                </div>
+                <InvoicePreview order={selectedOrderForInvoice} language={language} onReady={setAdminInvoiceFile} />
 
                 {/* Print button row */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-center">
                   <button
                     onClick={() => handlePrintInvoice(selectedOrderForInvoice)}
+                    disabled={adminInvoiceFile?.orderId !== selectedOrderForInvoice.id || adminInvoiceFile?.language !== language}
                     className="px-6 h-12 border border-white/20 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded text-xs font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
                   >
-                    <span>🖨 IMPRIMER LA FACTURE DIRECTE</span>
+                    <span>{language === 'FR' ? 'Telecharger la facture PDF' : 'Download PDF invoice'}</span>
                   </button>
                   <button
                     onClick={() => {

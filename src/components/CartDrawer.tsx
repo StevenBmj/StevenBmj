@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { Trash2, ShoppingBag, X, Tag, ShieldCheck, CreditCard } from 'lucide-react';
 
@@ -30,66 +31,25 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
   const discountPercent = appliedPromo?.discountPercent || 0;
   const appliedCode = appliedPromo?.code || '';
 
-  // Preset promo codes logic
-  const validCoupons: Record<string, number> = {
-    'STEVENBMJ10': 10,
-    'PRESTIGE20': 20,
-    'WELCOMEVIP': 15
-  };
-
   const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     setPromoError('');
     const code = coupon.trim().toUpperCase();
     if (!code) return;
-
     try {
-      const res = await fetch('/api/promos');
-      if (res.ok) {
-        const promos = await res.json();
-        const matching = promos.find((p: any) => p.code.toUpperCase() === code && p.active);
-        
-        if (matching) {
-          setAppliedPromo({
-            code: matching.code,
-            discountPercent: matching.discountPercentage
-          });
-          setCoupon('');
-        } else {
-          // Fallback to local codes
-          if (validCoupons[code] !== undefined) {
-            setAppliedPromo({
-              code: code,
-              discountPercent: validCoupons[code]
-            });
-            setCoupon('');
-          } else {
-            setPromoError(language === 'FR' ? 'Code promo invalide ou expiré.' : 'Invalid or expired promo code.');
-          }
-        }
-      } else {
-        // Fallback to local codes
-        if (validCoupons[code] !== undefined) {
-          setAppliedPromo({
-            code: code,
-            discountPercent: validCoupons[code]
-          });
-          setCoupon('');
-        } else {
-          setPromoError(language === 'FR' ? 'Code promo invalide.' : 'Invalid promotional code.');
-        }
+      const response = await fetch('/api/promos?code=' + encodeURIComponent(code));
+      if (!response.ok) throw new Error('Promo unavailable');
+      const promos = await response.json();
+      const matching = promos[0];
+      if (!matching || (matching.minAmount && subTotal < matching.minAmount)) {
+        setAppliedPromo(null);
+        setPromoError(language === 'FR' ? 'Code invalide, expire ou minimum non atteint.' : 'Invalid, expired code or minimum not reached.');
+        return;
       }
-    } catch (err) {
-      // Fallback to local codes
-      if (validCoupons[code] !== undefined) {
-        setAppliedPromo({
-          code: code,
-          discountPercent: validCoupons[code]
-        });
-        setCoupon('');
-      } else {
-        setPromoError(language === 'FR' ? 'Erreur de connexion.' : 'Connection error.');
-      }
+      setAppliedPromo({ code: matching.code, discountPercent: matching.discountPercentage });
+      setCoupon('');
+    } catch {
+      setPromoError(language === 'FR' ? 'Verification impossible. Reessayez.' : 'Unable to verify. Please retry.');
     }
   };
 
@@ -311,7 +271,6 @@ export default function CartDrawer({ onCheckout }: CartDrawerProps) {
                     <button
                       id="btn-checkout-trigger"
                       onClick={() => {
-                        setCartOpen(false);
                         onCheckout();
                       }}
                       className="w-full bg-amber-400 text-black py-3.5 rounded text-xs select-none font-black font-mono tracking-widest uppercase hover:bg-amber-300 transition-colors cursor-pointer text-center flex items-center justify-center gap-2 shadow-xl"

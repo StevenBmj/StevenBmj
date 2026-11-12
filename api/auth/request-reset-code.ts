@@ -1,108 +1,46 @@
-import { createClient } from '@supabase/supabase-js';
-
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase();
-
-function json(res: any, status: number, body: any) {
-  res.status(status).setHeader('content-type', 'application/json');
-  res.end(JSON.stringify(body));
-}
-
-function supabaseAdmin() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Supabase environment variables are missing.');
-  }
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
-async function readBody(req: any) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? JSON.parse(raw) : {};
-}
-
-async function sendCode(email: string, code: string) {
-  if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
-  const nodemailer = (await import('nodemailer')).default;
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_APP_PASSWORD },
-  });
-  await transporter.sendMail({
-    from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
-    to: email,
-    subject: 'Code de sécurité StevenBmj',
-    html: `<p>Votre code de validation StevenBmj est :</p><h2>${code}</h2>`,
-  });
-  return true;
-}
+import { adminClient, authRateLimit, clearSession, hashCode, matchesCode, newCode, readJson, reply } from '../../src/server/security';
+import { sendEmail } from '../_supabase';
 
 export default async function handler(req: any, res: any) {
   try {
-    if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-    const body = await readBody(req);
+    if (req.method !== 'POST') return reply(res, 405, { error: 'Method not allowed' });
+    const body = await readJson(req);
     const email = String(body.email || '').trim().toLowerCase();
-    if (!email) return json(res, 400, { error: "L'adresse email est requise." });
-
-    const supabase = supabaseAdmin();
-    const submittedCode = String(body.code || '').trim();
-    const newPassword = String(body.newPassword || '');
-
-    if (submittedCode || newPassword) {
-      if (!submittedCode || !newPassword) return json(res, 400, { error: 'Le code et le nouveau mot de passe sont requis.' });
-      if (newPassword.length < 8) return json(res, 400, { error: 'Le mot de passe doit contenir au moins 8 caracteres.' });
-      const profile = await supabase.from('profiles').select('*').eq('email', email).maybeSingle();
-      if (profile.error) throw profile.error;
-      if (!profile.data) return json(res, 404, { error: "Aucun compte client n'existe sous cet identifiant." });
-      if (profile.data.is_admin) return json(res, 403, { error: 'Utilisez la recuperation administrateur.' });
-      if (!profile.data.reset_code || String(profile.data.reset_code).trim() !== submittedCode) {
-        return json(res, 403, { error: 'Le code de reinitialisation est incorrect ou expire.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply(res, 400, { error: 'Email invalide.' });
+    const code = String(body.code || '').trim().toUpperCase();
+    const password = String(body.newPassword || '');
+    const submitting = Boolean(code || password);
+    if (!(await authRateLimit(req, res, submitting ? 'reset-verify' : 'reset-send', submitting ? 5 : 3, 300, email))) return;
+    const client = adminClient();
+    const profile = await client.from('profiles').select('*').eq('email', email).maybeSingle();
+    if (profile.error) throw new Error('Profile unavailable');
+    if (submitting) {
+      if (!code || password.length < 8 || password.length > 1024) return reply(res, 400, { error: 'Code et mot de passe de 8 caracteres minimum requis.' });
+      const expiry = Date.parse(profile.data?.reset_expires_at || '');
+      if (!profile.data || !Number.isFinite(expiry) || expiry <= Date.now() || !matchesCode(profile.data.reset_code, email, 'reset', code)) {
+        return reply(res, 403, { error: 'Code incorrect ou expire.' });
       }
-      const expiresAt = profile.data.reset_expires_at ? new Date(profile.data.reset_expires_at).getTime() : 0;
-      if (!expiresAt || Date.now() > expiresAt) {
-        return json(res, 403, { error: 'Le code de reinitialisation est expire. Demandez un nouveau code.' });
-      }
-      const update = await supabase.auth.admin.updateUserById(profile.data.id, { password: newPassword });
-      if (update.error) throw update.error;
-      const cleared = await supabase.from('profiles').update({ reset_code: '', reset_expires_at: null }).eq('email', email);
-      if (cleared.error) throw cleared.error;
-      return json(res, 200, { success: true, message: 'Votre mot de passe a ete modifie avec succes.' });
+      // Consume atomically before changing credentials: concurrent redemption loses.
+      const consumed = await client.from('profiles').update({ reset_code: '', reset_expires_at: null })
+        .eq('id', profile.data.id).eq('reset_code', profile.data.reset_code).select('id').maybeSingle();
+      if (consumed.error) throw new Error('Code storage unavailable');
+      if (!consumed.data) return reply(res, 403, { error: 'Code incorrect ou expire.' });
+      const revoked = await client.from('web_sessions').delete().eq('user_id', profile.data.id);
+      if (revoked.error) throw new Error('Unable to revoke sessions');
+      const changed = await client.auth.admin.updateUserById(profile.data.id, { password });
+      if (changed.error) throw new Error('Unable to change password');
+      clearSession(req, res);
+      return reply(res, 200, { success: true, message: 'Mot de passe modifie. Reconnectez-vous.' });
     }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    if (email === ADMIN_EMAIL) {
-      const current = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
-      const data = {
-        ...(current.data?.data || {}),
-        adminResetCode: code,
-        adminResetExpiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-      };
-      const { error } = await supabase.from('app_settings').upsert({ id: 'default', data }, { onConflict: 'id' });
-      if (error) throw error;
-      await sendCode(email, code);
-      return json(res, 200, { success: true, message: `Un code de validation administrative a été envoyé sur ${ADMIN_EMAIL}.` });
+    if (profile.data) {
+      const generated = newCode();
+      const stored = await client.from('profiles').update({ reset_code: hashCode(email, 'reset', generated), reset_expires_at: new Date(Date.now() + 300000).toISOString() }).eq('id', profile.data.id);
+      if (stored.error) throw new Error('Unable to save code');
+      const sent = await sendEmail(email, 'Reinitialisation de votre mot de passe StevenBmj', `<p>Votre code de reinitialisation :</p><h2>${generated}</h2><p>Valable cinq minutes. Si vous n'avez pas demande ce code, ignorez ce message.</p>`);
+      if (!sent) throw new Error('Email unavailable');
     }
-
-    const profile = await supabase.from('profiles').select('*').eq('email', email).maybeSingle();
-    if (profile.error) throw profile.error;
-    if (!profile.data) return json(res, 404, { error: "Aucun compte client n'existe sous cet identifiant." });
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ reset_code: code, reset_expires_at: new Date(Date.now() + 5 * 60_000).toISOString() })
-      .eq('email', email);
-    if (error) throw error;
-    await sendCode(email, code);
-    return json(res, 200, { success: true, message: 'Un code de modification a été transmis à votre adresse e-mail.' });
-  } catch (error: any) {
-    return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });
+    return reply(res, 200, { success: true, message: 'Si un compte correspond a cette adresse, un code valable cinq minutes est envoye par e-mail.' });
+  } catch {
+    return reply(res, 503, { error: 'Recuperation temporairement indisponible. Demandez un nouveau code plus tard.' });
   }
 }

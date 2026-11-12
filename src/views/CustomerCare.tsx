@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { HelpCircle, ChevronRight, ChevronDown, Mail, Phone, Clock, FileText, Send } from 'lucide-react';
 

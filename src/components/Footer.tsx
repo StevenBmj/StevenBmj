@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
 import { Mail, ArrowRight, Instagram, Phone, Globe, ShieldCheck, Heart } from 'lucide-react';
@@ -253,15 +254,9 @@ export default function Footer({ setView }: FooterProps) {
           >
             {language === 'FR' ? 'Mentions légales' : 'Legal Notice'}
           </button>
-          <a 
-            href="mailto:Stevenamorin202@gmail.com"
-            className="hover:text-amber-400 text-neutral-600 duration-300 decoration-none uppercase border-l border-white/10 pl-4"
-            title="Prestataire de Discussion Privée"
-          >
-            {language === 'FR' ? 'Réalisé par SHADOW007' : 'Built by SHADOW007'}
-          </a>
         </div>
       </div>
+      <p className="mt-6 text-center text-xs text-neutral-400">{language === 'FR' ? 'Réalisé par StevenBmj' : 'Built by StevenBmj'}</p>
 
       {/* RENDER DYNAMIC POLICY MODAL FOR COUTURE COMPLIANCE */}
       {activePolicy && (
@@ -365,11 +360,11 @@ export default function Footer({ setView }: FooterProps) {
                       <strong>Email :</strong> <span className="text-amber-400 font-mono">stevenbmj202@gmail.com</span>
                     </p>
 
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">Hébergement Cyber-Sécurisé</h3>
+                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">{language === 'FR' ? 'Hébergement' : 'Hosting'}</h3>
                     <p>
                       {language === 'FR'
-                        ? "Hébergé sur les infrastructures isolées Cloud Run en Europe avec pare-feu Cyber-Espace et filtrage proactif d'injections."
-                        : "Hosted on isolated high-speed Cloud servers with real-time firewalls and threat logs verification."}
+                        ? "Le site est hébergé sur Vercel. Les données sont stockées dans le projet Supabase de StevenBmj."
+                        : "The site is hosted on Vercel. Data is stored in StevenBmj’s Supabase project."}
                     </p>
                   </div>
                 </div>

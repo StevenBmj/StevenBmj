@@ -4,6 +4,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiFetch as fetch } from '../lib/api';
+import { useNavigation } from './NavigationContext';
 import { Product, OrderItem, Category, AppSettings } from '../types';
 
 interface AppContextType {
@@ -16,6 +18,9 @@ interface AppContextType {
   removeFromCart: (productId: string, size?: string) => void;
   updateCartQuantity: (productId: string, quantity: number, size?: string) => void;
   clearCart: () => void;
+  replaceCart: (items: OrderItem[]) => void;
+  preparedContact: { name: string; email: string; message: string } | null;
+  setPreparedContact: (draft: { name: string; email: string; message: string } | null) => void;
   wishlist: string[]; // array of product ids
   toggleWishlist: (productId: string) => void;
   history: string[]; // visited product ids
@@ -30,6 +35,7 @@ interface AppContextType {
   hasIntroPlayed: boolean;
   setHasIntroPlayed: (played: boolean) => void;
   products: Product[];
+  productsLoading: boolean;
   setProducts: (prods: Product[]) => void;
   fetchProducts: () => void;
   settings: AppSettings | null;
@@ -41,7 +47,8 @@ interface AppContextType {
   setLastInvoice: (order: any | null) => void;
   user: any | null;
   setUser: (u: any | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
+  authLoading: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
   triggerAuthRequired: (callbackOnSuccess: () => void) => void;
@@ -51,20 +58,24 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { route, openPanel, closePanel } = useNavigation();
   const [language, setLanguageState] = useState<'FR' | 'EN'>('FR');
   const [currency, setCurrencyState] = useState<'EUR' | 'CFA' | 'USD'>('EUR');
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [history, setHistory] = useState<string[]>([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const cartOpen = route.panel === 'panier';
   const [chatOpen, setChatOpen] = useState(false);
   const [vipPoints, setVipPoints] = useState(0);
-  const [hasIntroPlayed, setHasIntroPlayed] = useState(false);
+  const [hasIntroPlayed, setHasIntroPlayed] = useState(() => sessionStorage.getItem('sbmj_intro_played') === 'true');
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [settings, setSettingsState] = useState<AppSettings | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<any | null>(null);
   const [lastInvoice, setLastInvoiceState] = useState<any | null>(null);
   const [user, setUserState] = useState<any | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [preparedContact, setPreparedContact] = useState<AppContextType['preparedContact']>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authCallback, setAuthCallback] = useState<(() => void) | null>(null);
 
@@ -92,8 +103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const savedCartOpen = localStorage.getItem('sbmj_cart_open');
-    if (savedCartOpen === 'true') setCartOpen(true);
+    localStorage.removeItem('sbmj_cart_open');
 
     const savedPromo = localStorage.getItem('sbmj_applied_promo');
     if (savedPromo) {
@@ -101,15 +111,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAppliedPromo(JSON.parse(savedPromo));
       } catch (e) {
         console.error("Failed to load promo", e);
-      }
-    }
-
-    const savedInvoice = localStorage.getItem('sbmj_last_invoice');
-    if (savedInvoice) {
-      try {
-        setLastInvoiceState(JSON.parse(savedInvoice));
-      } catch (e) {
-        console.error("Failed to load invoice", e);
       }
     }
 
@@ -134,20 +135,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const savedVip = localStorage.getItem('sbmj_vip');
     if (savedVip) setVipPoints(Number(savedVip));
 
-    const savedUser = localStorage.getItem('sbmj_user');
-    if (savedUser) {
+    localStorage.removeItem('sbmj_user');
+    sessionStorage.removeItem('sbmj_admin_auth');
+    let mounted = true;
+    const expired = () => { setUserState(null); setLastInvoiceState(null); };
+    window.addEventListener('sbmj:session-expired', expired);
+    const restoreSession = async () => {
       try {
-        setUserState(JSON.parse(savedUser));
-      } catch (e) {
-        console.error("Failed to load user session", e);
-      }
-    }
+        let response = await fetch('/api/auth/session');
+        if (response.status === 401) response = await fetch('/api/auth/session', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'refresh' }),
+        });
+        if (mounted && response.ok) setUser((await response.json()).user);
+      } catch { /* An offline browser must not invent an authenticated identity. */ }
+      finally { if (mounted) setAuthLoading(false); }
+    };
+    void restoreSession();
 
     fetchProducts();
     fetchSettings();
+    return () => { mounted = false; window.removeEventListener('sbmj:session-expired', expired); };
   }, []);
 
   const fetchProducts = async () => {
+    setProductsLoading(true);
     try {
       const res = await fetch('/api/products');
       if (res.ok) {
@@ -156,6 +167,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.error("Error fetching products from server API", err);
+    } finally {
+      setProductsLoading(false);
     }
   };
 
@@ -191,8 +204,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const persistCartOpen = (open: boolean) => {
-    setCartOpen(open);
-    localStorage.setItem('sbmj_cart_open', String(open));
+    if (open) openPanel('panier');
+    else if (route.panel === 'panier') closePanel();
   };
 
   const persistAppliedPromo = (promo: any | null) => {
@@ -307,12 +320,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSetIntroPlayed = (played: boolean) => {
     setHasIntroPlayed(played);
+    sessionStorage.setItem('sbmj_intro_played', String(played));
   };
 
   const setUser = (u: any | null) => {
     setUserState(u);
+    setLastInvoiceState(null);
     if (u) {
-      localStorage.setItem('sbmj_user', JSON.stringify(u));
+      // Restore private browser data only after the server has verified its owner.
+      try {
+        const invoice = JSON.parse(localStorage.getItem('sbmj_last_invoice') || 'null');
+        if (invoice?.email?.toLowerCase() === u.email?.toLowerCase()) setLastInvoiceState(invoice);
+        else localStorage.removeItem('sbmj_last_invoice');
+        const draft = JSON.parse(localStorage.getItem('sbmj_checkout_draft') || 'null');
+        if (draft && draft.userId !== u.id) localStorage.removeItem('sbmj_checkout_draft');
+      } catch {
+        localStorage.removeItem('sbmj_last_invoice');
+        localStorage.removeItem('sbmj_checkout_draft');
+      }
       if (u.vipPoints !== undefined) {
         setVipPoints(u.vipPoints);
         localStorage.setItem('sbmj_vip', u.vipPoints.toString());
@@ -322,9 +347,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const response = await fetch('/api/auth/session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }),
+    });
+    if (!response.ok) throw new Error(language === 'FR' ? 'Deconnexion impossible. Reessayez.' : 'Unable to sign out. Please retry.');
     setUserState(null);
+    setLastInvoice(null);
+    localStorage.removeItem('sbmj_checkout_draft');
+    setAuthCallback(null);
+    setPreparedContact(null);
     localStorage.removeItem('sbmj_user');
+    sessionStorage.removeItem('sbmj_admin_auth');
   };
 
   const triggerAuthRequired = (callbackOnSuccess: () => void) => {
@@ -356,6 +390,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         removeFromCart,
         updateCartQuantity,
         clearCart,
+        replaceCart: saveCart,
+        preparedContact,
+        setPreparedContact,
         wishlist,
         toggleWishlist,
         history,
@@ -370,6 +407,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hasIntroPlayed,
         setHasIntroPlayed: handleSetIntroPlayed,
         products,
+        productsLoading,
         setProducts,
         fetchProducts,
         settings,
@@ -380,6 +418,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastInvoice,
         setLastInvoice,
         user,
+        authLoading,
         setUser,
         logout,
         authModalOpen,

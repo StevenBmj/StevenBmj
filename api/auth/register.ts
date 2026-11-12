@@ -1,21 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'crypto';
+import { authRateLimit, hashCode, newCode, readJson, reply } from '../../src/server/security';
+import { sendEmail } from '../_supabase';
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase();
 
 function isValidPersonName(value: string) {
   return /^[\p{L}' -]{2,80}$/u.test(value.trim()) && !/\d/.test(value);
 }
 
 function generateActivationCode() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from(randomBytes(6), (byte) => alphabet[byte % alphabet.length]).join('');
+  return newCode();
 }
 
-function json(res: any, status: number, body: any) {
-  res.status(status).setHeader('content-type', 'application/json');
-  res.end(JSON.stringify(body));
-}
+const json = reply;
 
 function supabaseAdmin() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -26,28 +22,7 @@ function supabaseAdmin() {
   });
 }
 
-async function readBody(req: any) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? JSON.parse(raw) : {};
-}
-
-async function findAuthUserByEmail(supabase: any, email: string) {
-  const target = email.trim().toLowerCase();
-  let page = 1;
-  while (page < 20) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw error;
-    const found = data.users.find((user: any) => String(user.email || '').toLowerCase() === target);
-    if (found) return found;
-    if (data.users.length < 1000) break;
-    page += 1;
-  }
-  return null;
-}
+const readBody = (req: any) => readJson(req, 64_000);
 
 function publicUser(profile: any) {
   return {
@@ -62,51 +37,30 @@ function publicUser(profile: any) {
 }
 
 async function sendActivationEmail(email: string, activationCode: string) {
-  try {
-    if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
-    const nodemailer = (await import('nodemailer')).default;
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_APP_PASSWORD },
-    });
-    await transporter.sendMail({
-      from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
-      to: email,
-      subject: 'Activation de votre compte Maison StevenBmj',
-      html: `<p>Votre code d'activation StevenBmj est :</p><h2>${activationCode}</h2><p>Ce code expire dans 5 minutes.</p>`,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  return sendEmail(email, 'Activation de votre compte Maison StevenBmj',
+    `<p>Votre code d'activation StevenBmj :</p><h2>${activationCode}</h2><p>Ce code expire dans 5 minutes.</p>`).catch(() => false);
 }
 
 export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
+    if (!(await authRateLimit(req, res, 'register', 5, 300))) return;
     const body = await readBody(req);
     const name = String(body.name || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
+    if (email === (process.env.ADMIN_EMAIL || 'stevenamorin202@gmail.com').toLowerCase()) return json(res, 409, { error: 'Ce compte doit utiliser la connexion ou la recuperation de mot de passe.' });
     const password = String(body.password || '');
     if (!name || !email || !password) return json(res, 400, { error: 'Tous les champs sont requis.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { error: "L'adresse e-mail n'est pas au format valide." });
     if (!isValidPersonName(name)) return json(res, 400, { error: 'Le nom et le prenom ne doivent contenir que des lettres, espaces, apostrophes ou tirets.' });
-    if (password.length < 8) return json(res, 400, { error: 'Le mot de passe doit contenir au moins 8 caracteres.' });
+    if (password.length < 8 || password.length > 1024) return json(res, 400, { error: 'Le mot de passe doit contenir entre 8 et 1024 caracteres.' });
 
     const supabase = supabaseAdmin();
     const existing = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
     if (existing.error) throw existing.error;
     if (existing.data) return json(res, 409, { error: 'Cette adresse e-mail est deja utilisee. Connectez-vous ou utilisez Mot de passe oublie.' });
 
-    const existingAuthUser = await findAuthUserByEmail(supabase, email);
-    if (existingAuthUser) {
-      return json(res, 409, { error: 'Cette adresse e-mail est deja liee a un compte. Connectez-vous ou utilisez Mot de passe oublie.' });
-    }
-
-    const isAdmin = email === ADMIN_EMAIL;
+    const isAdmin = false;
     const activationCode = isAdmin ? '' : generateActivationCode();
     const activationExpiresAt = isAdmin ? null : new Date(Date.now() + 5 * 60_000).toISOString();
     const auth = await supabase.auth.admin.createUser({
@@ -115,7 +69,7 @@ export default async function handler(req: any, res: any) {
       email_confirm: true,
       user_metadata: { name },
     });
-    if (auth.error || !auth.data.user) return json(res, 400, { error: auth.error?.message || 'Création impossible.' });
+    if (auth.error || !auth.data.user) return json(res, auth.error?.code === 'email_exists' ? 409 : 400, { error: 'Creation impossible : adresse deja utilisee ou donnees invalides.' });
 
     const profile = {
       id: auth.data.user.id,
@@ -125,7 +79,7 @@ export default async function handler(req: any, res: any) {
       vip_points: 100,
       is_admin: isAdmin,
       is_confirmed: isAdmin,
-      activation_code: activationCode,
+      activation_code: hashCode(email, 'activation', activationCode),
       activation_expires_at: activationExpiresAt,
       reset_code: '',
       reset_expires_at: null,
@@ -139,7 +93,7 @@ export default async function handler(req: any, res: any) {
 
     const emailSent = isAdmin ? true : await sendActivationEmail(email, activationCode);
     if (!emailSent) {
-      await supabase.from('profiles').delete().eq('email', email);
+      await supabase.from('profiles').delete().eq('id', auth.data.user.id);
       await supabase.auth.admin.deleteUser(auth.data.user.id);
       return json(res, 500, { error: "Impossible d'envoyer le code d'activation par e-mail. Verifiez la configuration SMTP puis reessayez." });
     }
@@ -152,6 +106,6 @@ export default async function handler(req: any, res: any) {
       user: isAdmin ? publicUser(profile) : null,
     });
   } catch (error: any) {
-    return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });
+    return json(res, 500, { error: 'Erreur serveur API' });
   }
 }

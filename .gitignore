@@ -8,3 +8,8 @@ coverage/
 !.env.example
 
 .vercel
+db_store.json
+.codex-private/
+supabase/.temp/
+test-results/
+playwright-report/

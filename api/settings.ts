@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { publicSettings, requireUser, readJson, reply } from '../src/server/security';
 
-function json(res: any, status: number, body: any) {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'no-store');
-  res.status(status).setHeader('content-type', 'application/json');
-  res.end(JSON.stringify(body));
-}
+const json = reply;
 
 function clientIp(req: any) {
   return String(req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').split(',')[0].trim();
@@ -28,20 +24,7 @@ function supabaseAdmin() {
   });
 }
 
-async function readBody(req: any) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of req) {
-    const buffer = Buffer.from(chunk);
-    total += buffer.length;
-    if (total > 2_000_000) throw new Error('Configuration trop volumineuse.');
-    chunks.push(buffer);
-  }
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? JSON.parse(raw) : {};
-}
+const readBody = (req: any) => readJson(req, 2_000_000);
 
 async function addSecurityLog(supabase: any, req: any, event: string, status = 'SECURED') {
   await supabase.from('security_logs').insert({
@@ -55,18 +38,19 @@ async function addSecurityLog(supabase: any, req: any, event: string, status = '
 
 export default async function handler(req: any, res: any) {
   try {
+    if (req.method !== 'GET' && !(await requireUser(req, res, true))) return;
     const supabase = supabaseAdmin();
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
       if (error) throw error;
-      return json(res, 200, data?.data || {});
+      return json(res, 200, publicSettings(data?.data));
     }
 
     if (req.method === 'POST') {
       const body = await readBody(req);
       const current = await supabase.from('app_settings').select('*').eq('id', 'default').maybeSingle();
       if (current.error) throw current.error;
-      const merged = { ...(current.data?.data || {}), ...body };
+      const merged = { ...publicSettings(current.data?.data), ...publicSettings(body) };
       const { error } = await supabase.from('app_settings').upsert({ id: 'default', data: merged }, { onConflict: 'id' });
       if (error) throw error;
       await addSecurityLog(supabase, req, 'Configuration du site mise a jour', 'SECURED');
@@ -75,6 +59,6 @@ export default async function handler(req: any, res: any) {
 
     return json(res, 405, { error: 'Method not allowed' });
   } catch (error: any) {
-    return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });
+    return json(res, 500, { error: 'Erreur serveur API' });
   }
 }

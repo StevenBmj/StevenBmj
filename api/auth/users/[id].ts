@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { clearSession, requireUser } from '../../../src/server/security';
 
 function json(res: any, status: number, body: any) {
   res.status(status).setHeader('content-type', 'application/json');
@@ -17,14 +18,18 @@ function supabaseAdmin() {
 export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'DELETE') return json(res, 405, { error: 'Method not allowed' });
+    const actor = await requireUser(req, res);
+    if (!actor) return;
     const id = String(req.query.id || '');
     if (!id) return json(res, 400, { error: 'ID utilisateur requis.' });
+    if (actor.profile.is_admin !== true && actor.profile.id !== id) return json(res, 403, { error: 'Acces refuse.' });
     const supabase = supabaseAdmin();
     const profile = await supabase.from('profiles').select('is_admin').eq('id', id).maybeSingle();
     if (profile.error) throw profile.error;
     if (profile.data?.is_admin) return json(res, 403, { error: 'Le compte admin ne peut pas être supprimé ici.' });
     const deleted = await supabase.auth.admin.deleteUser(id);
     if (deleted.error) throw deleted.error;
+    if (actor.profile.id === id) clearSession(req, res);
     return json(res, 200, { success: true, message: 'Le compte client a été supprimé avec succès.' });
   } catch (error: any) {
     return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });

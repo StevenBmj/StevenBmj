@@ -1,11 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireUser, readJson, reply } from '../src/server/security';
 
-function json(res: any, status: number, body: any) {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'no-store');
-  res.status(status).setHeader('content-type', 'application/json');
-  res.end(JSON.stringify(body));
-}
+const json = reply;
 
 function supabaseAdmin() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -39,20 +35,7 @@ function rowToProduct(row: any) {
   };
 }
 
-async function readBody(req: any) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of req) {
-    const buffer = Buffer.from(chunk);
-    total += buffer.length;
-    if (total > 2_000_000) throw new Error('Payload produit trop volumineux.');
-    chunks.push(buffer);
-  }
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? JSON.parse(raw) : {};
-}
+const readBody = (req: any) => readJson(req, 2_000_000);
 
 function cleanText(value: any, max = 400) {
   return String(value || '')
@@ -102,6 +85,7 @@ async function addSecurityLog(supabase: any, req: any, event: string, status = '
 
 export default async function handler(req: any, res: any) {
   try {
+    if (req.method !== 'GET' && !(await requireUser(req, res, true))) return;
     const supabase = supabaseAdmin();
     const id = cleanText(req.query?.id, 80);
 
@@ -136,6 +120,6 @@ export default async function handler(req: any, res: any) {
 
     return json(res, 405, { error: 'Method not allowed' });
   } catch (error: any) {
-    return json(res, 500, { error: 'Erreur serveur API', message: error?.message || String(error) });
+    return json(res, 500, { error: 'Erreur serveur API' });
   }
 }

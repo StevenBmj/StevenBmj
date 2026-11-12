@@ -3,18 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { Phone, Mail, MapPin, Clock, Send } from 'lucide-react';
 
 export default function ContactUs() {
-  const { language, settings } = useApp();
+  const { language, settings, preparedContact, setPreparedContact } = useApp();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!preparedContact) return;
+    setName(preparedContact.name);
+    setEmail(preparedContact.email);
+    setMessage(preparedContact.message);
+    setSubmitted(false);
+    setPreparedContact(null);
+  }, [preparedContact, setPreparedContact]);
 
   const titleFr = settings?.contactTitle || "SALON PRIVÉ & SERVICES CONCIERGERIE";
   const titleEn = settings?.contactTitleEn || "PRIVATE VAULT & CONCIERGE SERVICES";

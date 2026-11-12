@@ -1,0 +1,11 @@
+.git
+.env*
+!.env.example
+.kilo
+.codex-private
+db_store.json
+tests
+test-results
+playwright-report
+docs
+supabase/.temp

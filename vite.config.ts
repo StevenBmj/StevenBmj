@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    optimizeDeps: { exclude: ['pdfjs-dist'] },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -27,6 +28,7 @@ export default defineConfig(() => {
             if (id.includes('motion')) return 'motion-vendor';
             if (id.includes('@supabase')) return 'supabase-vendor';
             if (id.includes('lucide-react')) return 'icons-vendor';
+            if (id.includes('pdfjs-dist')) return 'pdf-preview-vendor';
             if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf-vendor';
             if (id.includes('libphonenumber-js')) return 'phone-vendor';
             if (id.includes('qrcode')) return 'qr-vendor';

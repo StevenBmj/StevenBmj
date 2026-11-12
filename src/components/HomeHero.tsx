@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Sparkles, ShieldCheck, Award, Gem, Check, Star, MessageSquare, Pen } from 'lucide-react';
@@ -75,27 +76,27 @@ function HeroBackground() {
     {
       src: src1,
       animate: { scale: [1, 1.08, 1], x: [0, 10, 0] },
-      transition: { duration: 10, ease: "easeInOut" }
+      transition: { duration: 10, ease: "easeInOut" as const }
     },
     {
       src: src2,
       animate: { scale: [1.06, 1, 1.06], x: [0, -20, 0] },
-      transition: { duration: 10, ease: "easeInOut" }
+      transition: { duration: 10, ease: "easeInOut" as const }
     },
     {
       src: src3,
       animate: { scale: [1.1, 1.02, 1.1], y: [0, -15, 0] },
-      transition: { duration: 10, ease: "easeInOut" }
+      transition: { duration: 10, ease: "easeInOut" as const }
     },
     {
       src: defaultImages[3],
       animate: { scale: [1, 1.1, 1], y: [0, 20, 0] },
-      transition: { duration: 10, ease: "easeInOut" }
+      transition: { duration: 10, ease: "easeInOut" as const }
     },
     {
       src: defaultImages[4],
       animate: { scale: [1.08, 1, 1.08], rotate: [0, 0.5, 0] },
-      transition: { duration: 10, ease: "easeInOut" }
+      transition: { duration: 10, ease: "easeInOut" as const }
     }
   ];
 

@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Product } from '../types';
 import { MOCK_REVIEWS } from '../data/products';
-import { Star, ShoppingBag, Heart, Shield, Sparkles, RefreshCw, Send, HelpCircle, Eye } from 'lucide-react';
+import { Star, ShoppingBag, Heart, Shield, Sparkles, RefreshCw, Send, HelpCircle, Eye, ArrowLeft } from 'lucide-react';
 
 interface ProductDetailProps {
   product: Product;
@@ -208,11 +208,12 @@ export default function ProductDetail({ product, onClose, onSelectProduct, onOpe
         <button
           id="btn-back-to-boutique"
           onClick={onClose}
-          className="text-neutral-500 hover:text-white text-xs uppercase tracking-widest flex items-center gap-2 duration-300 cursor-pointer"
+          className="min-h-11 shrink-0 text-neutral-300 hover:text-amber-400 text-sm flex items-center gap-2 duration-300 cursor-pointer"
         >
-          ← {language === 'FR' ? 'Retourner à la boutique' : 'Back to exhibition'}
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          {language === 'FR' ? 'Retour' : 'Back'}
         </button>
-        <span className="text-[10px] font-mono tracking-widest text-neutral-600 block uppercase">
+        <span className="ml-4 min-w-0 break-words text-right text-[10px] font-mono text-neutral-600 block uppercase">
           STEVENBMJ HAUTE COUTURE SYSTEM CODE: {product.id}
         </span>
       </div>

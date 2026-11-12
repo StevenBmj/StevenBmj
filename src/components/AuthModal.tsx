@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { X, Mail, Lock, User, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -655,7 +656,7 @@ export default function AuthModal() {
                       id="activation-input-code"
                       type="text"
                       required
-                      maxLength={6}
+                      maxLength={8}
                       value={activationCode}
                       onChange={(e) => setActivationCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                       placeholder="A7B9K2"

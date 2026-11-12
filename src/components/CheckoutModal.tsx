@@ -3,47 +3,49 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import InvoicePreview from './InvoicePreview';
+import { invoiceWhatsApp } from '../lib/invoice';
+import type { InvoiceFile } from '../lib/invoicePdf';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
 import { ShieldCheck, Truck, FileText, ArrowRight, ArrowLeft } from 'lucide-react';
-import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js';
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 
 interface CheckoutModalProps {
   onClose: () => void;
   onOrderSuccess: (order: any) => void;
 }
 
-async function imageToDataUrl(src: string) {
-  const response = await fetch(src);
-  if (!response.ok) throw new Error(`Unable to load image: ${src}`);
-  const blob = await response.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ''));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
 
 export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModalProps) {
-  const { language, cart, formatPrice, clearCart, currency, appliedPromo, setAppliedPromo, lastInvoice, setLastInvoice, user } = useApp();
-  const invoiceCardRef = useRef<HTMLDivElement | null>(null);
+  const { language, cart, products, replaceCart, formatPrice, clearCart, appliedPromo, setAppliedPromo, lastInvoice, setLastInvoice, user } = useApp();
+  const [invoiceFile, setInvoiceFile] = useState<InvoiceFile | null>(null);
+  const [draft] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sbmj_checkout_draft') || 'null');
+      return saved?.userId === user.id ? saved : null;
+    } catch { return null; }
+  });
+  const [requestId] = useState<string>(() => /^[0-9a-f-]{36}$/i.test(draft?.requestId || '') ? draft.requestId : crypto.randomUUID());
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(draft?.editingOrderId || null);
+  const [submitError, setSubmitError] = useState('');
 
   // Form states
-  const [customerName, setCustomerName] = useState('');
-  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('BJ');
-  const [localPhone, setLocalPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [notes, setNotes] = useState('');
+  const [customerName, setCustomerName] = useState(draft?.customerName || user.name || '');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(getCountries().includes(draft?.phoneCountry) ? draft.phoneCountry : 'BJ');
+  const [localPhone, setLocalPhone] = useState(String(draft?.localPhone || '').replace(/\D/g, ''));
+  const [email, setEmail] = useState(user.email || '');
+  const [address, setAddress] = useState(draft?.address || '');
+  const [city, setCity] = useState(draft?.city || '');
+  const [notes, setNotes] = useState(draft?.notes || '');
   
   // States of order process
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [completedOrderState, setCompletedOrderState] = useState<any | null>(() => lastInvoice || null);
+  const [completedOrderState, setCompletedOrderState] = useState<any | null>(() => !draft?.editingOrderId && lastInvoice
+    && (cart.length === 0 || lastInvoice.id === draft?.invoiceId || lastInvoice.id === `SBMJ-${requestId}`) ? lastInvoice : null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [invoiceQrDataUrl, setInvoiceQrDataUrl] = useState('');
   const completedOrder = completedOrderState;
 
   const countryOptions = useMemo(() => {
@@ -85,35 +87,9 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
   });
 
   useEffect(() => {
-    if (lastInvoice && !completedOrderState) {
-      setCompletedOrderState(lastInvoice);
-    }
-  }, [lastInvoice, completedOrderState]);
-
-  useEffect(() => {
-    const savedDraft = localStorage.getItem('sbmj_checkout_draft');
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        setCustomerName(draft.customerName || '');
-        setPhoneCountry(draft.phoneCountry || 'BJ');
-        setLocalPhone(String(draft.localPhone || '').replace(/\D/g, ''));
-        setEmail(draft.email || '');
-        setAddress(draft.address || '');
-        setCity(draft.city || '');
-        setNotes(draft.notes || '');
-      } catch (error) {
-        console.error('Failed to restore checkout draft', error);
-      }
-    } else if (user) {
-      setCustomerName((prev) => prev || user.name || '');
-      setEmail((prev) => prev || user.email || '');
-    }
-  }, [user]);
-
-  useEffect(() => {
     if (completedOrder) return;
     localStorage.setItem('sbmj_checkout_draft', JSON.stringify({
+      userId: user.id, requestId, editingOrderId,
       customerName,
       phoneCountry,
       localPhone,
@@ -122,44 +98,8 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
       city,
       notes,
     }));
-  }, [address, city, completedOrder, customerName, email, localPhone, notes, phoneCountry]);
+  }, [address, city, completedOrder, customerName, email, localPhone, notes, phoneCountry, requestId, editingOrderId, user.id]);
 
-  useEffect(() => {
-    if (!completedOrder) {
-      setInvoiceQrDataUrl('');
-      return;
-    }
-
-    let cancelled = false;
-    const qrPayload = [
-      'MAISON STEVENBMJ',
-      `Facture de prestige: ${completedOrder.id}`,
-      `Client: ${completedOrder.customerName}`,
-      `Total paye: ${completedOrder.totalPrice} ${completedOrder.currency || currency}`,
-      `Date emission: ${new Date(completedOrder.date).toLocaleDateString('fr-FR')}`,
-      `Achats: ${completedOrder.items.map((it: any) => `${it.quantity}x ${it.productName}`).join(', ')}`,
-      'Authenticite StevenBmj garantie.',
-    ].join('\n');
-
-    import('qrcode')
-      .then((QRCode) => QRCode.toDataURL(qrPayload, {
-        width: 240,
-        margin: 1,
-        color: { dark: '#121212', light: '#ffffff' },
-        errorCorrectionLevel: 'M',
-      }))
-      .then((dataUrl) => {
-        if (!cancelled) setInvoiceQrDataUrl(dataUrl);
-      })
-      .catch((error) => {
-        console.error('Unable to generate invoice QR code', error);
-        if (!cancelled) setInvoiceQrDataUrl('');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [completedOrder, currency]);
 
   const subTotal = useMemo(() => {
     return cart.reduce((acc, item) => {
@@ -169,7 +109,7 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
   }, [cart]);
 
   const discountAmount = useMemo(() => {
-    return Math.round((subTotal * activeDiscount) / 100);
+    return Math.round(subTotal * activeDiscount) / 100;
   }, [subTotal, activeDiscount]);
 
   const shippingCost = useMemo(() => {
@@ -181,30 +121,11 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
     return Math.max(0, subTotal - discountAmount + shippingCost);
   }, [subTotal, discountAmount, shippingCost]);
 
-  const invoiceBreakdown = useMemo(() => {
-    if (!completedOrder) return null;
-    const invoiceSubtotal = completedOrder.items.reduce((sum: number, item: any) => {
-      return sum + Number(item.price || 0) * Number(item.quantity || 1);
-    }, 0);
-    const promoMatch = String(completedOrder.notes || '').match(/Code Promo:\s*([A-Z0-9_-]+)\s*-(\d+)%/i);
-    const discountPercent = activeDiscount || Number(promoMatch?.[2] || 0);
-    const invoiceDiscount = discountPercent > 0
-      ? Math.round((invoiceSubtotal * discountPercent) / 100)
-      : Math.max(0, invoiceSubtotal - Number(completedOrder.totalPrice || 0));
-    const invoiceShipping = Math.max(0, Number(completedOrder.totalPrice || 0) - (invoiceSubtotal - invoiceDiscount));
-    return {
-      subtotal: invoiceSubtotal,
-      discountAmount: invoiceDiscount,
-      discountPercent,
-      shippingCost: invoiceShipping,
-      promoCode: promoCodeInput || promoMatch?.[1] || appliedPromo?.code || '',
-    };
-  }, [activeDiscount, appliedPromo, completedOrder, promoCodeInput]);
 
   const handleApplyPromo = async () => {
     if (!promoCodeInput) return;
     try {
-      const res = await fetch('/api/promos');
+      const res = await fetch('/api/promos?code=' + encodeURIComponent(promoCodeInput.trim().toUpperCase()));
       if (res.ok) {
         const promos = await res.json();
         const code = promoCodeInput.trim().toUpperCase();
@@ -256,14 +177,17 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
     if (!customerName || /\d/.test(customerName) || !fullWhatsapp || !email || !address || !city) return;
 
     setIsSubmitting(true);
+    setSubmitError('');
 
       const orderPayload = {
+      requestId,
+      promoCode: appliedPromo?.code || undefined,
       customerName,
       whatsapp: fullWhatsapp,
       email,
       address,
       city,
-      notes: notes + (promoCodeInput && activeDiscount > 0 ? ` (Code Promo: ${promoCodeInput.toUpperCase()} -${activeDiscount}%)` : ''),
+      notes,
       items: cart.map(item => ({
         productId: item.product.id,
         productName: item.product.name,
@@ -272,12 +196,12 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
         selectedSize: item.selectedSize
       })),
       totalPrice: finalTotal,
-      currency: currency
+      currency: 'EUR'
     };
 
     try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
+      const res = await fetch(editingOrderId ? `/api/orders/${encodeURIComponent(editingOrderId)}` : '/api/orders', {
+        method: editingOrderId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderPayload)
       });
@@ -285,288 +209,72 @@ export default function CheckoutModal({ onClose, onOrderSuccess }: CheckoutModal
       if (res.ok) {
         const data = await res.json();
         updateCompletedOrder(data.order);
+        setEditingOrderId(null);
+        localStorage.setItem('sbmj_checkout_draft', JSON.stringify({ userId: user.id, requestId, invoiceId: data.order.id }));
         if (onOrderSuccess) {
           onOrderSuccess(data.order);
         }
+      } else {
+        setSubmitError(language === 'FR' ? 'La commande n’a pas été enregistrée. Vérifiez le panier et réessayez ; votre facture précédente est conservée.'
+          : 'The order was not saved. Check your cart and retry; your previous invoice is preserved.');
       }
-    } catch (err) {
-      console.error("Order submit failed", err);
+    } catch {
+      setSubmitError(language === 'FR' ? 'Connexion interrompue. Réessayez sans fermer cette page.' : 'Connection interrupted. Retry without closing this page.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const buildWhatsAppUrl = () => {
-    if (!completedOrder) return '';
-
-    const waNumber = "22955468138";
-    
-    const itemsText = completedOrder.items.map((item: any) => {
-      const sizeLine = item.selectedSize ? ` (Taille: ${item.selectedSize})` : '';
-      return `- ${item.quantity}x ${item.productName}${sizeLine} / ${formatPrice(item.price * item.quantity)}`;
-    }).join('\n');
-
-    const message = `🌟 *ORDRE DE COMMANDE - M. ${completedOrder.customerName.toUpperCase()}* 🌟
-----------------------------------
-*Référence Unique :* ${completedOrder.id}
-*Date :* ${new Date(completedOrder.date).toLocaleString('fr-FR')}
-
-👤 *INFORMATIONS CLIENT :*
-• *Nom complet :* ${completedOrder.customerName}
-• *Numéro WhatsApp :* ${completedOrder.whatsapp}
-• *Lieu de livraison :* ${completedOrder.address}
-• *Ville :* ${completedOrder.city}
-• *Notes de livraison :* ${completedOrder.notes || 'Aucune'}
-
-📦 *SÉLECTION D'EXCEPTION :*
-${itemsText}
-
-💳 *RÈGLEMENT DE PRESTIGE :*
-• *Total Final :* ${formatPrice(completedOrder.totalPrice)}
-
-----------------------------------
-✨ _Ordre enregistré auprès du système de conciergerie StevenBmj d'Afrique de l'Ouest et Internationale. Merci pour votre haute confiance._ ✨`;
-
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${waNumber}?text=${encodedMessage}`;
-  };
-
-  // Automated WhatsApp Message Trigger
-  const handleWhatsAppRedirect = () => {
-    const waUrl = buildWhatsAppUrl();
-    if (waUrl) window.open(waUrl, '_blank');
-  };
+  const buildWhatsAppUrl = () => completedOrder ? invoiceWhatsApp(completedOrder, language) : '';
 
   const handleReturnToEdit = async () => {
     if (!completedOrder) return;
     const order = completedOrder;
+    if (order.status !== 'pending' || order.paymentStatus !== 'pending') {
+      setSubmitError(language === 'FR' ? 'Cette commande ne peut plus être modifiée. Contactez la boutique.' : 'This order can no longer be edited. Please contact the store.');
+      return;
+    }
+    const items = order.items.map((item: any) => ({ product: products.find(product => product.id === item.productId), quantity: item.quantity, selectedSize: item.selectedSize }));
+    if (items.some((item: any) => !item.product)) {
+      setSubmitError(language === 'FR' ? 'Un article est indisponible. Votre facture est conservée ; contactez la boutique.' : 'An item is unavailable. Your invoice is preserved; please contact the store.');
+      return;
+    }
+    replaceCart(items);
     setCustomerName(order.customerName || '');
     setEmail(order.email || email || '');
     setAddress(order.address || '');
     setCity(order.city || '');
     setNotes(order.notes || '');
-    const digits = String(order.whatsapp || '').replace(/\D/g, '');
-    const matchedCountry = countryOptions.find((option) => digits.startsWith(option.code));
-    if (matchedCountry) {
-      setPhoneCountry(matchedCountry.country);
-      setLocalPhone(digits.slice(matchedCountry.code.length));
+    const phone = parsePhoneNumberFromString(order.whatsapp || '');
+    if (phone?.country) {
+      setPhoneCountry(phone.country);
+      setLocalPhone(phone.nationalNumber);
     }
-    updateCompletedOrder(null);
-    try {
-      await fetch(`/api/orders/${encodeURIComponent(order.id)}`, { method: 'DELETE' });
-    } catch (error) {
-      console.error('Unable to delete draft order before editing', error);
-    }
+    setSubmitError('');
+    setEditingOrderId(order.id);
+    setCompletedOrderState(null);
+    const promo = order.pricingSnapshot;
+    setPromoCodeInput(promo?.promoCode || '');
+    setActiveDiscount(promo?.discountPercent || 0);
+    setAppliedPromo(promo?.promoCode ? { code: promo.promoCode, discountPercent: promo.discountPercent } : null);
   };
 
   const handleDownloadInvoiceAndWhatsApp = async () => {
-    if (!completedOrder) return;
-    if (!invoiceQrDataUrl) {
-      alert(language === 'FR' ? 'Le QR code de la facture est en preparation. Reessayez dans un instant.' : 'The invoice QR code is still being prepared. Try again in a moment.');
-      return;
-    }
-    const whatsappWindow = window.open('about:blank', '_blank');
+    if (!completedOrder || !invoiceFile || invoiceFile.orderId !== completedOrder.id || invoiceFile.language !== language || actionLoading) return;
     setActionLoading(true);
     try {
-      const [{ jsPDF }, logoDataUrl] = await Promise.all([
-        import('jspdf'),
-        imageToDataUrl('/logo.png'),
-      ]);
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 44;
-      const gold: [number, number, number] = [245, 158, 11];
-      const dark: [number, number, number] = [5, 5, 5];
-      const panel: [number, number, number] = [18, 18, 18];
-      const muted: [number, number, number] = [155, 155, 155];
-      const white: [number, number, number] = [255, 255, 255];
-      const subtotal = invoiceBreakdown?.subtotal ?? completedOrder.items.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.quantity || 1), 0);
-      const orderDiscountAmount = invoiceBreakdown?.discountAmount ?? 0;
-      const orderShippingCost = invoiceBreakdown?.shippingCost ?? 0;
-      const orderPromoCode = invoiceBreakdown?.promoCode || '';
-      const pdfCopy = (fr: string, en: string) => language === 'FR' ? fr : en;
-
-      const setText = (rgb: [number, number, number], size: number, style: 'normal' | 'bold' = 'normal') => {
-        pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
-        pdf.setFont('helvetica', style);
-        pdf.setFontSize(size);
-      };
-
-      const drawFrame = () => {
-        pdf.setFillColor(dark[0], dark[1], dark[2]);
-        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-        pdf.setDrawColor(gold[0], gold[1], gold[2]);
-        pdf.setLineWidth(1);
-        pdf.rect(margin - 8, margin - 8, pageWidth - (margin - 8) * 2, pageHeight - (margin - 8) * 2);
-        pdf.setDrawColor(90, 61, 16);
-        pdf.rect(margin - 2, margin - 2, pageWidth - (margin - 2) * 2, pageHeight - (margin - 2) * 2);
-      };
-
-      const addWrapped = (text: string, x: number, y: number, width: number, lineHeight = 13) => {
-        const lines = pdf.splitTextToSize(String(text || ''), width);
-        pdf.text(lines, x, y);
-        return y + lines.length * lineHeight;
-      };
-
-      const addClamped = (text: string, x: number, y: number, width: number, lineHeight = 11, maxLines = 2) => {
-        const lines = pdf.splitTextToSize(String(text || ''), width).slice(0, maxLines);
-        pdf.text(lines, x, y);
-        return y + lines.length * lineHeight;
-      };
-
-      const ensureSpace = (y: number, needed = 90) => {
-        if (y + needed <= pageHeight - margin) return y;
-        pdf.addPage();
-        drawFrame();
-        return margin + 18;
-      };
-
-      drawFrame();
-      pdf.addImage(logoDataUrl, 'PNG', margin, margin, 54, 54);
-      setText(white, 22);
-      pdf.text('STEVENBMJ', margin + 68, margin + 28);
-      setText(gold, 7, 'bold');
-      pdf.text(pdfCopy('HAUTE COUTURE ET JOAILLERIE', 'HAUTE COUTURE AND FINE JEWELRY'), margin + 70, margin + 43);
-      setText(gold, 12, 'bold');
-      pdf.text(pdfCopy('FACTURE DE PRESTIGE', 'PRESTIGE INVOICE'), pageWidth - margin, margin + 18, { align: 'right' });
-      setText(muted, 8);
-      pdf.text(`REF: ${completedOrder.id}`, pageWidth - margin, margin + 34, { align: 'right' });
-      pdf.text(new Date(completedOrder.date).toLocaleString(language === 'FR' ? 'fr-FR' : 'en-US'), pageWidth - margin, margin + 48, { align: 'right' });
-      pdf.setDrawColor(90, 61, 16);
-      pdf.line(margin, margin + 78, pageWidth - margin, margin + 78);
-
-      let y = margin + 112;
-      const columnWidth = (pageWidth - margin * 2 - 22) / 2;
-      pdf.setFillColor(panel[0], panel[1], panel[2]);
-      pdf.roundedRect(margin, y - 18, columnWidth, 118, 4, 4, 'F');
-      pdf.roundedRect(margin + columnWidth + 22, y - 18, columnWidth, 118, 4, 4, 'F');
-
-      setText(gold, 8, 'bold');
-      pdf.text(pdfCopy('DESTINATAIRE VIP', 'VIP RECIPIENT'), margin + 14, y);
-      setText(white, 11, 'bold');
-      let buyerY = addClamped(String(completedOrder.customerName || '').toUpperCase(), margin + 14, y + 20, columnWidth - 28, 12, 2);
-      setText(muted, 8);
-      buyerY = addClamped(`WhatsApp: ${completedOrder.whatsapp}`, margin + 14, buyerY + 3, columnWidth - 28, 11, 1);
-      if (completedOrder.email) buyerY = addClamped(`Email: ${completedOrder.email}`, margin + 14, buyerY + 2, columnWidth - 28, 11, 2);
-      addClamped(`${completedOrder.address}, ${completedOrder.city}`, margin + 14, buyerY + 2, columnWidth - 28, 11, 2);
-
-      setText(gold, 8, 'bold');
-      pdf.text(pdfCopy('MAISON DE VENTES', 'RETAIL HOUSE'), margin + columnWidth + 36, y);
-      setText(white, 10, 'bold');
-      pdf.text('StevenBmj West Africa SARL', margin + columnWidth + 36, y + 20);
-      setText(muted, 8);
-      pdf.text(pdfCopy('Siege Cotonou, Benin', 'HQ Cotonou, Benin'), margin + columnWidth + 36, y + 37);
-      pdf.text(pdfCopy('Contact Concierge: +22955468138', 'Concierge Desk: +22955468138'), margin + columnWidth + 36, y + 52);
-      pdf.text('Email: stevenbmj202@gmail.com', margin + columnWidth + 36, y + 67);
-
-      y += 144;
-      setText(gold, 8, 'bold');
-      pdf.text(pdfCopy('CREATION / SELECTION', 'CREATION / SELECTION'), margin, y);
-      pdf.text(pdfCopy('QTE', 'QTY'), pageWidth - margin - 170, y, { align: 'center' });
-      pdf.text(pdfCopy('PRIX', 'UNIT'), pageWidth - margin - 82, y, { align: 'right' });
-      pdf.text(pdfCopy('MONTANT', 'AMOUNT'), pageWidth - margin, y, { align: 'right' });
-      pdf.setDrawColor(90, 61, 16);
-      pdf.line(margin, y + 9, pageWidth - margin, y + 9);
-      y += 28;
-
-      completedOrder.items.forEach((item: any) => {
-        y = ensureSpace(y, 58);
-        const amount = Number(item.price || 0) * Number(item.quantity || 1);
-        setText(white, 10, 'bold');
-        const nameLines = pdf.splitTextToSize(String(item.productName || 'Creation StevenBmj'), pageWidth - margin * 2 - 210);
-        pdf.text(nameLines, margin, y);
-        let rowBottom = y + nameLines.length * 12;
-        if (item.selectedSize) {
-          setText(gold, 7, 'bold');
-          pdf.text(`${pdfCopy('TAILLE', 'SIZE')}: ${item.selectedSize}`, margin, rowBottom + 7);
-          rowBottom += 12;
-        }
-        setText(white, 8);
-        pdf.text(String(item.quantity || 1), pageWidth - margin - 170, y, { align: 'center' });
-        pdf.text(formatPrice(Number(item.price || 0)), pageWidth - margin - 82, y, { align: 'right' });
-        pdf.text(formatPrice(amount), pageWidth - margin, y, { align: 'right' });
-        pdf.setDrawColor(42, 42, 42);
-        pdf.line(margin, rowBottom + 9, pageWidth - margin, rowBottom + 9);
-        y = rowBottom + 28;
-      });
-
-      if (completedOrder.notes) {
-        y = ensureSpace(y, 58);
-        setText(gold, 8, 'bold');
-        pdf.text(pdfCopy("NOTES D'ATELIER", 'ATELIER NOTES'), margin, y);
-        setText(muted, 8);
-        y = addWrapped(completedOrder.notes, margin, y + 16, pageWidth - margin * 2, 12) + 12;
-      }
-
-      y = ensureSpace(y, 188);
-      pdf.setDrawColor(90, 61, 16);
-      pdf.line(margin, y, pageWidth - margin, y);
-      y += 28;
-      pdf.addImage(invoiceQrDataUrl, 'PNG', margin, y, 72, 72);
-      setText(gold, 8, 'bold');
-      pdf.text(pdfCopy("CERTIFICAT D'AUTHENTICITE", 'CERTIFICATE OF AUTHENTICITY'), margin + 88, y + 18);
-      setText(muted, 7);
-      addWrapped(
-        pdfCopy(
-          "Cette facture reprend les informations visibles sur le site et certifie l'ordre de commande StevenBmj.",
-          'This invoice mirrors the on-site invoice and certifies the StevenBmj order.'
-        ),
-        margin + 88,
-        y + 34,
-        210,
-        10
-      );
-
-      const totalsX = pageWidth - margin;
-      const totalsLabelX = totalsX - 168;
-      let totalsY = y + 4;
-      setText(muted, 8);
-      pdf.text(pdfCopy('Sous-total', 'Subtotal'), totalsLabelX, totalsY);
-      pdf.text(formatPrice(subtotal), totalsX, totalsY, { align: 'right' });
-      totalsY += 18;
-      if (orderDiscountAmount > 0) {
-        setText([52, 211, 153], 8, 'bold');
-        pdf.text(`${pdfCopy('Réduction', 'Discount')} ${orderPromoCode ? `(${orderPromoCode})` : ''}`, totalsLabelX, totalsY);
-        pdf.text(`-${formatPrice(orderDiscountAmount)}`, totalsX, totalsY, { align: 'right' });
-        totalsY += 18;
-      }
-      setText(muted, 8);
-      pdf.text(pdfCopy('Expédition de valeur', 'Valued shipping'), totalsLabelX, totalsY);
-      setText([52, 211, 153], 8, 'bold');
-      pdf.text(orderShippingCost === 0 ? pdfCopy('Offerte', 'Complimentary') : formatPrice(orderShippingCost), totalsX, totalsY, { align: 'right' });
-      totalsY += 26;
-      setText(white, 9, 'bold');
-      pdf.text(pdfCopy('TOTAL PAYE', 'TOTAL PAID'), totalsLabelX, totalsY);
-      setText(gold, String(formatPrice(completedOrder.totalPrice)).length > 16 ? 13 : 17, 'bold');
-      pdf.text(formatPrice(completedOrder.totalPrice), totalsX, totalsY + 2, { align: 'right' });
-      setText(muted, 6);
-      pdf.text(pdfCopy(
-        'Maison StevenBmj - Cotonou, Benin - Facture generee automatiquement apres validation client.',
-        'Maison StevenBmj - Cotonou, Benin - Invoice generated automatically after client validation.'
-      ), pageWidth / 2, pageHeight - 24, { align: 'center' });
-
-      pdf.save(`facture-stevenbmj-${completedOrder.id}.pdf`);
+      const link = document.createElement('a');
+      link.href = invoiceFile.url;
+      link.download = invoiceFile.filename;
+      link.click();
+      const waUrl = buildWhatsAppUrl();
       clearCart();
       setAppliedPromo(null);
       localStorage.removeItem('sbmj_checkout_draft');
-      const waUrl = buildWhatsAppUrl();
-      if (whatsappWindow && waUrl) {
-        whatsappWindow.location.href = waUrl;
-      } else if (waUrl) {
-        window.location.href = waUrl;
-      }
-    } catch (error) {
-      whatsappWindow?.close();
-      console.error('PDF generation failed', error);
-      alert(language === 'FR'
-        ? "Impossible de generer le PDF automatiquement. Verifiez que les images sont chargees puis reessayez."
-        : "Unable to generate the PDF automatically. Check that images are loaded and try again."
-      );
-    } finally {
-      setActionLoading(false);
-    }
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      alert(language === 'FR' ? 'Le telechargement a echoue. Reessayez.' : 'Download failed. Please retry.');
+    } finally { setActionLoading(false); }
   };
 
   return (
@@ -731,7 +439,7 @@ ${itemsText}
                 id="btn-submit-order-form"
                 type="submit"
                 disabled={isSubmitting || cart.length === 0}
-                className="w-full h-12 bg-amber-400 text-black rounded text-xs tracking-widest font-mono uppercase font-black hover:bg-amber-300 transition-colors cursor-pointer flex items-center justify-center gap-2 mt-4"
+                className="w-full min-h-12 py-3 px-3 bg-amber-400 text-black rounded text-xs tracking-widest font-mono uppercase font-black hover:bg-amber-300 transition-colors cursor-pointer flex items-center justify-center gap-2 mt-4"
               >
                 {isSubmitting ? (
                   <span>{language === 'FR' ? "GÉNÉRATION FACTURE DE LUXE..." : "GENERATING PRESTIGE INVOICE..."}</span>
@@ -742,6 +450,7 @@ ${itemsText}
                   </>
                 )}
               </button>
+              {submitError && <p role="alert" className="text-sm text-red-300">{submitError}</p>}
             </form>
 
             {/* Selection Curation Summary column */}
@@ -841,159 +550,8 @@ ${itemsText}
           // State 2: Order Complete, showing the Gorgeous Black and Gold Luxury Invoice!
           <div id="print-area" className="p-4 sm:p-6 md:p-12 space-y-8 bg-black text-white selection:bg-amber-500/20">
             
-            {/* The Luxury Double Border Invoice Card */}
-            <div
-              id="invoice-card"
-              ref={invoiceCardRef}
-              className="border-4 border-double border-amber-500/30 p-4 sm:p-6 md:p-8 rounded bg-neutral-950 tracking-wide relative"
-            >
-              
-              {/* Gold watermark design element in background */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.02] pointer-events-none">
-                <Logo size={400} />
-              </div>
-
-              {/* Top Row Invoice Branding header */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-amber-500/20 pb-6 gap-6">
-                <div className="flex items-center space-x-3 text-left">
-                  <Logo size={60} />
-                  <div>
-                    <span className="text-2xl font-light tracking-[0.25em] text-white uppercase font-sans">StevenBmj</span>
-                    <span className="text-[8px] font-mono tracking-[0.4em] text-amber-500 block uppercase">
-                      {language === 'FR' ? 'HAUTE COUTURE ET JOAILLERIE' : 'HAUTE COUTURE AND FINE JEWELRY'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-left md:text-right font-mono text-[10px] text-neutral-400 space-y-1">
-                  <p className="text-yellow-400 font-semibold tracking-wider uppercase text-xs">
-                    {language === 'FR' ? 'FACTURE DE PRESTIGE' : 'PRESTIGE INVOICE'}
-                  </p>
-                  <p>{language === 'FR' ? 'FACTURE ID' : 'INVOICE ID'}: {completedOrder.id}</p>
-                  <p>{language === 'FR' ? "DATE D'ÉMISSION" : "DATE OF ISSUE"}: {new Date(completedOrder.date).toLocaleDateString(language === 'FR' ? 'fr-FR' : 'en-US')}</p>
-                  <p>{language === 'FR' ? 'ATELIER' : 'ATELIER'}: Paris / Bénin / Genève</p>
-                </div>
-              </div>
-
-              {/* Buyer / Seller Details column */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8 text-xs border-b border-white/5">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block mb-1">
-                    {language === 'FR' ? 'DESTINATAIRE VIP' : 'VIP RECIPIENT'}
-                  </span>
-                  <p className="font-semibold text-white uppercase text-sm">{completedOrder.customerName}</p>
-                  <p className="text-neutral-400 font-mono">WhatsApp: {completedOrder.whatsapp}</p>
-                  <p className="text-neutral-450">{completedOrder.address}, {completedOrder.city}</p>
-                  {completedOrder.notes && (
-                    <p className="text-[10px] text-neutral-500 italic mt-2">
-                      {language === 'FR' ? "Notes d'Atelier" : "Atelier Notes"}: {completedOrder.notes}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1 md:text-right text-left">
-                  <span className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase block mb-1">
-                    {language === 'FR' ? 'MAISON DE VENTES' : 'RETAIL HOUSE'}
-                  </span>
-                  <p className="font-semibold text-white">StevenBmj West Africa SARL</p>
-                  <p className="text-neutral-400">{language === 'FR' ? 'Siège Cotonou, Bénin' : 'HQ Cotonou, Benin'}</p>
-                  <p className="text-neutral-400">{language === 'FR' ? 'Contact Concierge' : 'Concierge Desk'}: +22955468138</p>
-                  <p className="text-neutral-500">Email: stevenbmj202@gmail.com</p>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div className="py-6 overflow-x-auto">
-                <table className="w-full text-left text-xs text-neutral-400 border-collapse">
-                  <thead>
-                    <tr className="border-b border-amber-500/20 text-white uppercase tracking-wider text-[10px] font-mono">
-                      <th className="py-3 pr-4">{language === 'FR' ? 'CRÉATION / SÉLECTION' : 'CREATION / SELECTION'}</th>
-                      <th className="py-3 px-4 text-center">{language === 'FR' ? 'QUANTITÉ' : 'QUANTITY'}</th>
-                      <th className="py-3 px-4 text-right">{language === 'FR' ? 'PRIX UNITAIRE' : 'UNIT PRICE'}</th>
-                      <th className="py-3 pl-4 text-right">{language === 'FR' ? 'MONTANT NET' : 'NET AMOUNT'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 font-mono">
-                    {completedOrder.items.map((item: any, id: number) => (
-                      <tr key={id} className="hover:bg-white/5 duration-300">
-                        <td className="py-4 pr-4 font-sans text-white">
-                          <span className="font-medium text-xs block">{item.productName}</span>
-                          {item.selectedSize && (
-                            <span className="text-[9px] font-mono text-amber-500/80 uppercase">
-                              {language === 'FR' ? 'Taille sélectionnée' : 'Selected size'}: {item.selectedSize}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-4 text-center text-neutral-300">{item.quantity}</td>
-                        <td className="py-4 px-4 text-right text-neutral-300">{formatPrice(item.price)}</td>
-                        <td className="py-4 pl-4 text-right text-white font-semibold">{formatPrice(item.price * item.quantity)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Calculations and Visual Signature QR Code bottom */}
-              <div className="border-t border-amber-500/20 pt-6 flex flex-col md:flex-row md:justify-between gap-6 md:gap-8 items-stretch md:items-center">
-                
-                {/* Simulated luxury certificate signature stamp */}
-                <div className="flex items-center space-x-4 bg-neutral-900/60 p-4 border border-white/5 rounded">
-                  <div className="w-16 h-16 bg-white p-1 rounded inline-block shrink-0 flex items-center justify-center">
-                    {invoiceQrDataUrl ? (
-                      <img
-                        src={invoiceQrDataUrl}
-                        alt="QR Code Facture Souveraine"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-[9px] text-neutral-700 font-mono text-center">QR</span>
-                    )}
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider">
-                      {language === 'FR' ? "CERTIFICAT D'AUTHENTICITÉ" : "CERTIFICATE OF AUTHENTICITY"}
-                    </p>
-                    <p className="text-[9px] text-neutral-500 leading-snug">
-                      {language === 'FR' 
-                        ? "Scanner ce timbre pour vérifier les garanties de propriété et l'originalité de l'objet."
-                        : "Scan this stamp to verify physical property guarantees and digital authenticity."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right text-sm space-y-1.5 w-full md:min-w-[15rem] font-mono">
-                  {invoiceBreakdown && (
-                    <div className="flex justify-between text-neutral-500">
-                      <span>{language === 'FR' ? 'Sous-total :' : 'Subtotal :'}</span>
-                      <span className="text-white">{formatPrice(invoiceBreakdown.subtotal)}</span>
-                    </div>
-                  )}
-                  {invoiceBreakdown && invoiceBreakdown.discountAmount > 0 && (
-                    <div className="flex justify-between text-emerald-400">
-                      <span>
-                        {language === 'FR' ? 'Réduction' : 'Discount'}
-                        {invoiceBreakdown.promoCode ? ` (${invoiceBreakdown.promoCode})` : ''}
-                      </span>
-                      <span>-{formatPrice(invoiceBreakdown.discountAmount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-neutral-500">
-                    <span>{language === 'FR' ? 'Expédition de valeur :' : 'Valued shipping :'}</span>
-                    <span className="text-white">
-                      {invoiceBreakdown && invoiceBreakdown.shippingCost > 0
-                        ? formatPrice(invoiceBreakdown.shippingCost)
-                        : (language === 'FR' ? 'Gratuit' : 'Complimentary')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-yellow-500 text-lg font-bold border-t border-white/5 pt-2">
-                    <span>{language === 'FR' ? 'TOTAL FACTURÉ :' : 'TOTAL INVOICED :'}</span>
-                    <span>{formatPrice(completedOrder.totalPrice)}</span>
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
+            <InvoicePreview order={completedOrder} language={language} onReady={setInvoiceFile} />
+            {submitError && <p role="alert" className="text-sm text-red-300 text-center">{submitError}</p>}
 
             {/* Action row: edit or finalize with one combined PDF + WhatsApp action */}
             <div className="flex flex-col items-center justify-center gap-4 text-center mt-6">
@@ -1009,11 +567,11 @@ ${itemsText}
               <button
                 id="btn-print-invoice-complete"
                 onClick={handleDownloadInvoiceAndWhatsApp}
-                disabled={actionLoading || !invoiceQrDataUrl}
-                className="px-6 sm:px-8 h-12 bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-60 rounded text-xs font-black font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full max-w-xl justify-center shadow-[0_12px_30px_rgba(217,119,6,0.18)]"
+                disabled={actionLoading || !invoiceFile}
+                className="px-4 sm:px-8 min-h-12 py-3 bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-60 rounded text-xs font-black font-mono uppercase tracking-widest duration-300 flex items-center gap-2 cursor-pointer w-full max-w-xl justify-center shadow-[0_12px_30px_rgba(217,119,6,0.18)]"
               >
-                {!invoiceQrDataUrl ? (
-                  <span>{language === 'FR' ? 'Préparation du QR...' : 'Preparing QR...'}</span>
+                {!invoiceFile ? (
+                  <span>{language === 'FR' ? 'Préparation de la facture...' : 'Preparing invoice...'}</span>
                 ) : actionLoading ? (
                   <span>{language === 'FR' ? 'Préparation du PDF...' : 'Preparing PDF...'}</span>
                 ) : (

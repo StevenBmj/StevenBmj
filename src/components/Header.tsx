@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
 import { ShoppingBag, Heart, ShieldAlert, Languages, Coins, Menu, X, Landmark, User, LogOut, Key, Trash2 } from 'lucide-react';
@@ -30,6 +31,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  useEffect(() => { setMobileMenuOpen(false); }, [currentView]);
   const [activeAnnouncement, setActiveAnnouncement] = useState<any | null>(null);
 
   // Client change password states
@@ -55,7 +57,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
       const data = await res.json();
       if (res.ok) {
         setIsDeleteConfirmOpen(false);
-        logout();
+        await logout();
         setView('home');
       } else {
         setDeleteError(data.error || "Une erreur est survenue lors de la suppression de votre compte.");
@@ -110,6 +112,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
       const data = await res.json();
       if (res.ok) {
         setClientPasswordSuccess(language === 'FR' ? "Votre mot de passe a été mis à jour avec succès !" : "Your password was updated successfully!");
+        await logout();
         setClientSecurityCode('');
         setClientNewPassword('');
         setClientCodeSentFeedback('');
@@ -188,7 +191,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         
         {/* Left Links: Navigation (Hidden on mobile) */}
-        <nav className="hidden md:flex items-center space-x-3 lg:space-x-6">
+        <nav className="hidden xl:flex items-center space-x-3">
           {navLinks.map((link) => (
             <button
               id={`nav-link-${link.id}`}
@@ -225,13 +228,13 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
         </div>
 
         {/* Right Corner: Quick Controls (Language, Currency, Shopping Bag, Wishlist) */}
-        <div className="header-actions flex shrink-0 items-center space-x-1.5 sm:space-x-4">
+        <div className="header-actions flex shrink-0 items-center space-x-1.5 sm:space-x-3">
           
           {/* Currency cycle button (Desktop only, now inside mobile menu for mobile compatibility) */}
           <button
             id="btn-currency"
             onClick={cycleCurrency}
-            className="hidden md:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
+            className="hidden xl:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
             title={language === 'FR' ? 'Devise' : 'Currency'}
           >
             <Coins className="w-3.5 h-3.5 text-amber-500/85" />
@@ -242,7 +245,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           <button
             id="btn-lang"
             onClick={toggleLanguage}
-            className="hidden md:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
+            className="hidden xl:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
             title={language === 'FR' ? 'Langue' : 'Language'}
           >
             <Languages className="w-3.5 h-3.5 text-amber-500/85" />
@@ -250,7 +253,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           </button>
 
           {/* User profile section (Desktop only) */}
-          <div className="hidden md:block">
+          <div className="hidden xl:block">
             {user ? (
               <div className="relative group">
                 <button
@@ -267,7 +270,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                   ) : (
                     <User className="w-3.5 h-3.5" />
                   )}
-                  <span>{user.isAdmin ? (language === 'FR' ? "ADMIN" : "ADMIN") : user.name}</span>
+                  <span className="max-w-[110px] truncate">{user.isAdmin ? (language === 'FR' ? "ADMIN" : "ADMIN") : user.name}</span>
                 </button>
                 
                 {/* Dropdown menu overlay */}
@@ -380,7 +383,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           <button
             id="btn-mobile-menu-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="shrink-0 p-2 text-neutral-300 hover:text-white md:hidden cursor-pointer"
+            className="h-11 w-11 flex items-center justify-center shrink-0 text-neutral-300 hover:text-white xl:hidden cursor-pointer"
             aria-label={language === 'FR' ? 'Ouvrir le menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
           >
@@ -392,7 +395,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
 
       {/* Mobile Menu Panel */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-white/5 bg-black/95 px-4 sm:px-5 py-6 space-y-5 text-left divide-y divide-white/5 max-h-[calc(100vh-86px)] overflow-y-auto">
+        <div className="xl:hidden border-t border-white/5 bg-black/95 px-4 sm:px-5 py-6 space-y-5 text-left divide-y divide-white/5 max-h-[calc(100dvh-112px)] overflow-y-auto">
           <div className="flex flex-col space-y-1">
             {navLinks.map((link) => (
               <button

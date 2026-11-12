@@ -67,6 +67,9 @@ export interface Order {
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   date: string;
   pdfInvoiceUrl?: string;
+  pricingSnapshot?: import('./lib/invoice').PricingSnapshot;
+  verificationToken?: string;
+  paymentStatus?: 'unknown' | 'pending' | 'paid' | 'refunded';
 }
 
 export interface PromoCode {
@@ -150,7 +153,6 @@ export interface AppSettings {
   contactAddress?: string;
   contactAddressEn?: string;
   googleMapEmbedUrl?: string;
-  adminPassword?: string;
   careTitle?: string;
   careTitleEn?: string;
   careContent?: string;

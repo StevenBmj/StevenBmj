@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
+import { periodRange, readReportOrders, salesReport } from '../src/server/reports';
+import { assertSameOrigin, authRateLimit, readJson, requireUser } from '../src/server/security';
 
 function json(res: any, status: number, body: any) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -10,26 +13,12 @@ function json(res: any, status: number, body: any) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}' -]{2,80}$/u;
 const PHONE_RE = /^\+[1-9]\d{6,18}$/;
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
 function clientIp(req: any) {
-  return String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local').split(',')[0].trim();
+  return String(process.env.VERCEL === '1' ? req.headers['x-vercel-forwarded-for'] || 'unknown' : req.socket?.remoteAddress || 'local').split(',')[0].trim();
 }
 
-function rateLimit(req: any, res: any, scope: string, limit = 20, windowMs = 60_000) {
-  const key = `${scope}:${clientIp(req)}`;
-  const now = Date.now();
-  const current = rateBuckets.get(key);
-  if (!current || current.resetAt < now) {
-    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  current.count += 1;
-  if (current.count > limit) {
-    json(res, 429, { error: 'Trop de requetes. Veuillez patienter quelques instants.' });
-    return false;
-  }
-  return true;
+async function rateLimit(req: any, res: any, scope: string, limit = 20, windowMs = 60_000) {
+  return authRateLimit(req, res, scope, limit, Math.ceil(windowMs / 1000));
 }
 
 function cleanText(value: any, max = 600) {
@@ -81,21 +70,7 @@ function supabaseAdmin() {
   });
 }
 
-async function readBody(req: any) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for await (const chunk of req) {
-    const buffer = Buffer.from(chunk);
-    total += buffer.length;
-    if (total > 64_000) throw new Error('Payload trop volumineux.');
-    chunks.push(buffer);
-  }
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? JSON.parse(raw) : {};
-}
-
+const readBody = readJson;
 function rowToPromo(row: any) {
   return {
     code: row.code,
@@ -121,6 +96,9 @@ function rowToOrder(row: any) {
     status: row.status || 'pending',
     date: row.date,
     pdfInvoiceUrl: row.pdf_invoice_url || undefined,
+    pricingSnapshot: row.pricing_snapshot || undefined,
+    verificationToken: row.invoice_token || undefined,
+    paymentStatus: row.payment_status || 'unknown',
   };
 }
 
@@ -167,42 +145,20 @@ async function addSecurityLog(supabase: any, req: any, event: string, status = '
   }).then(() => null, () => null);
 }
 
-function analyticsRows(filter: string) {
-  const week = [
-    { name: 'Lundi / Mon', ventes: 18000, benefices: 7500, pertes: 0, revenus: 18000, visiteurs: 450, clics: 1200, conversion: 3.8 },
-    { name: 'Mardi / Tue', ventes: 29500, benefices: 12100, pertes: 0, revenus: 29500, visiteurs: 520, clics: 1530, conversion: 4.2 },
-    { name: 'Mercredi / Wed', ventes: 12500, benefices: 5000, pertes: 200, revenus: 12300, visiteurs: 480, clics: 1100, conversion: 3.1 },
-    { name: 'Jeudi / Thu', ventes: 34000, benefices: 15200, pertes: 0, revenus: 34000, visiteurs: 610, clics: 1980, conversion: 4.9 },
-    { name: 'Vendredi / Fri', ventes: 45000, benefices: 21000, pertes: 0, revenus: 45000, visiteurs: 750, clics: 2500, conversion: 5.5 },
-    { name: 'Samedi / Sat', ventes: 58000, benefices: 25600, pertes: 150, revenus: 57850, visiteurs: 890, clics: 3100, conversion: 6.1 },
-    { name: 'Dimanche / Sun', ventes: 39000, benefices: 16900, pertes: 0, revenus: 39000, visiteurs: 700, clics: 2200, conversion: 5.0 },
-  ];
-  const month = [
-    { name: 'Semaine 1', ventes: 110000, benefices: 48000, pertes: 1200, revenus: 108800, visiteurs: 3400, clics: 11200, conversion: 4.1 },
-    { name: 'Semaine 2', ventes: 145000, benefices: 65000, pertes: 500, revenus: 144500, visiteurs: 3900, clics: 12800, conversion: 4.6 },
-    { name: 'Semaine 3', ventes: 98000, benefices: 41000, pertes: 800, revenus: 97200, visiteurs: 3100, clics: 9500, conversion: 3.9 },
-    { name: 'Semaine 4', ventes: 185000, benefices: 83000, pertes: 0, revenus: 185000, visiteurs: 5200, clics: 17200, conversion: 5.2 },
-  ];
-  const year = [
-    { name: 'Jan', ventes: 450000, benefices: 200000, pertes: 3000, revenus: 447000, visiteurs: 12000, clics: 45000, conversion: 4.2 },
-    { name: 'Feb', ventes: 520000, benefices: 230000, pertes: 2500, revenus: 517500, visiteurs: 15000, clics: 51000, conversion: 4.5 },
-    { name: 'Mar', ventes: 410000, benefices: 180000, pertes: 4000, revenus: 406000, visiteurs: 11800, clics: 39000, conversion: 3.8 },
-    { name: 'Apr', ventes: 680000, benefices: 310000, pertes: 1000, revenus: 679000, visiteurs: 18500, clics: 62000, conversion: 5.1 },
-    { name: 'May', ventes: 890000, benefices: 405000, pertes: 1500, revenus: 888500, visiteurs: 22000, clics: 85000, conversion: 5.6 },
-    { name: 'Jun', ventes: 760000, benefices: 350000, pertes: 2000, revenus: 758000, visiteurs: 20500, clics: 78000, conversion: 5.0 },
-  ];
-  if (filter === 'month') return month;
-  if (filter === 'year') return year;
-  return week;
-}
 
 async function handlePromos(req: any, res: any, supabase: any) {
   const code = String(req.query?.code || '').trim().toUpperCase();
   const action = String(req.query?.action || '').trim();
 
   if (req.method === 'GET') {
-    const now = new Date().toISOString();
-    await supabase.from('promo_codes').update({ active: false }).eq('active', true).lt('expires_at', now);
+    if (code) {
+      if (!await authRateLimit(req, res, 'promo-check', 30, 300)) return;
+      const result = await supabase.from('promo_codes').select('*').eq('code', code).maybeSingle();
+      if (result.error) throw result.error;
+      const promo = result.data;
+      const valid = promo && promo.active && (!promo.expires_at || Date.parse(promo.expires_at) > Date.now());
+      return json(res, 200, valid ? [rowToPromo(promo)] : []);
+    }
     const { data, error } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return json(res, 200, (data || []).map(rowToPromo));
@@ -255,19 +211,38 @@ async function handlePromos(req: any, res: any, supabase: any) {
 
 async function handleOrders(req: any, res: any, supabase: any) {
   const id = String(req.query?.id || '').trim();
+  const actor = req.actor;
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
+    let query = supabase.from('orders').select('*').order('date', { ascending: false });
+    if (!actor.profile.is_admin) query = query.eq('email', actor.profile.email);
+    if (id) query = query.eq('id', id);
+    const { data, error } = await query;
     if (error) throw error;
     return json(res, 200, (data || []).map(rowToOrder));
   }
 
-  if (req.method === 'POST') {
-    if (!rateLimit(req, res, 'orders', 8, 60_000)) return;
+  if (req.method === 'POST' || req.method === 'PATCH') {
+    if (!await rateLimit(req, res, 'orders', 8, 60_000)) return;
     const body = await readBody(req);
+    const editing = req.method === 'PATCH';
+    const requestId = String(body.requestId || '');
+    if (requestId && !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(requestId)) return json(res, 400, { error: 'Identifiant de demande invalide.' });
+    if (editing && !id) return json(res, 400, { error: 'Reference de commande requise.' });
+    const orderId = editing ? id : `SBMJ-${requestId || randomUUID()}`;
+    let existing: any = null;
+    if (editing || requestId) {
+      const previous = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+      if (previous.error) throw previous.error;
+      existing = previous.data;
+      if (existing && existing.email !== actor.profile.email) return json(res, 403, { error: 'Acces a cette commande refuse.' });
+      if (!editing && existing) return json(res, 200, { success: true, order: rowToOrder(existing) });
+      if (editing && (!existing || existing.status !== 'pending' || existing.payment_status !== 'pending')) return json(res, 403, { error: 'Cette commande ne peut plus etre modifiee.' });
+    }
     const customerName = cleanText(body.customerName, 80);
     const whatsapp = cleanText(body.whatsapp, 24).replace(/\s+/g, '');
     const email = String(body.email || '').trim().toLowerCase();
+    if (email !== actor.profile.email.toLowerCase()) return json(res, 403, { error: 'Utilisez votre adresse de connexion.' });
     const address = cleanText(body.address, 220);
     const city = cleanText(body.city, 100);
     const notes = cleanText(body.notes, 800);
@@ -288,7 +263,51 @@ async function handleOrders(req: any, res: any, supabase: any) {
       return json(res, 403, { error: "Votre compte n'est pas encore active. Veuillez l'activer avec le code recu par e-mail." });
     }
 
-    const orderId = `SBMJ-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+    const ids = [...new Set(items.map((item: any) => String(item.productId || '')))];
+    const catalogue = await supabase.from('products').select('id,name,price,promo_price,stock,specs').in('id', ids);
+    if (catalogue.error) throw catalogue.error;
+    const quantities = new Map<string, number>();
+    const canonicalItems: any[] = [];
+    let subtotalCents = 0;
+    for (const item of items) {
+      const product = catalogue.data?.find((p: any) => p.id === item.productId);
+      const quantity = Number(item.quantity);
+      const accumulated = (quantities.get(item.productId) || 0) + quantity;
+      if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 99 || accumulated > Number(product.stock)) {
+        return json(res, 400, { error: 'Produit indisponible ou quantite invalide. Actualisez votre panier.' });
+      }
+      quantities.set(item.productId, accumulated);
+      const price = Number(product.promo_price ?? product.price);
+      const priceCents = Math.round(price * 100);
+      if (!Number.isFinite(priceCents) || priceCents < 0) throw new Error('Invalid catalogue price');
+      canonicalItems.push({ productId: product.id, productName: product.name, quantity, price: priceCents / 100,
+        selectedSize: cleanText(item.selectedSize, 40) || undefined });
+      subtotalCents += priceCents * quantity;
+    }
+    let discount = 0;
+    const promoCode = String(body.promoCode || '').trim().toUpperCase();
+    if (promoCode) {
+      const promoResult = await supabase.from('promo_codes').select('*').eq('code', promoCode).maybeSingle();
+      if (promoResult.error) throw promoResult.error;
+      const promo = promoResult.data;
+      discount = Number(promo?.discount_percentage || 0);
+      if (!promo?.active || !Number.isFinite(discount) || discount <= 0 || discount > 100
+        || (promo.expires_at && !(Date.parse(promo.expires_at) > Date.now()))
+        || subtotalCents < Number(promo.min_amount || 0) * 100) {
+        return json(res, 400, { error: 'Code promo invalide, expire ou minimum non atteint.' });
+      }
+    }
+    const netCents = subtotalCents - Math.round(subtotalCents * discount / 100);
+    const shippingCents = netCents >= 300000 ? 0 : 15000;
+    const config = await supabase.from('app_settings').select('data').eq('id', 'default').maybeSingle();
+    if (config.error) throw config.error;
+    const settings = config.data?.data || {};
+    const pricingSnapshot = {
+      version: 1, currency: 'EUR', subtotalCents, discountCents: subtotalCents - netCents,
+      discountPercent: discount, promoCode, shippingCents, totalCents: netCents + shippingCents,
+      seller: existing?.pricing_snapshot?.seller || { name: 'StevenBmj', address: cleanText(settings.contactAddress || 'Cotonou, Benin', 400),
+        phone: cleanText(settings.whatsappContact || '+22955468138', 30), email: conciergeEmail() },
+    };
     const row = {
       id: orderId,
       customer_name: customerName,
@@ -297,27 +316,38 @@ async function handleOrders(req: any, res: any, supabase: any) {
       address,
       city,
       notes: notes || null,
-      items: items.map((item: any) => ({
-        productId: cleanText(item.productId, 80),
-        productName: cleanText(item.productName, 180),
-        quantity: Math.max(1, Math.min(99, Number(item.quantity || 1))),
-        price: Math.max(0, Number(item.price || 0)),
-        selectedSize: cleanText(item.selectedSize, 40) || undefined,
-      })),
-      total_price: Math.max(0, Number(body.totalPrice || 0)),
-      currency: ['EUR', 'CFA', 'USD'].includes(String(body.currency)) ? body.currency : 'EUR',
+      items: canonicalItems,
+      total_price: (netCents + shippingCents) / 100,
+      currency: 'EUR',
+      pricing_snapshot: pricingSnapshot,
+      invoice_token: existing?.invoice_token || randomUUID(),
+      payment_status: 'pending',
       status: 'pending',
-      date: new Date().toISOString(),
+      date: existing?.date || new Date().toISOString(),
     };
-    const { data, error } = await supabase.from('orders').insert(row).select('*').single();
+    const mutation = editing ? supabase.from('orders').update(row).eq('id', orderId).eq('email', actor.profile.email).eq('status', 'pending').eq('payment_status', 'pending')
+      : supabase.from('orders').insert(row);
+    const { data, error } = await mutation.select('*').maybeSingle();
+    if (error?.code === '23505' && !editing && requestId) {
+      const duplicate = await supabase.from('orders').select('*').eq('id', orderId).eq('email', actor.profile.email).maybeSingle();
+      if (duplicate.data) return json(res, 200, { success: true, order: rowToOrder(duplicate.data) });
+    }
     if (error) throw error;
+    if (!data) return json(res, 409, { error: 'La commande a change. Actualisez avant de reessayer.' });
     await addSecurityLog(supabase, req, `Nouvelle commande ${orderId} - ${customerName}`, 'SECURED');
     return json(res, 200, { success: true, order: rowToOrder(data) });
   }
 
   if (req.method === 'DELETE') {
     if (!id) return json(res, 400, { error: 'ID commande requis.' });
-    const { error } = await supabase.from('orders').delete().eq('id', id);
+    if (!actor.profile.is_admin) {
+      const own = await supabase.from('orders').select('id,status,email,payment_status').eq('id', id).eq('email', actor.profile.email).maybeSingle();
+      if (own.error) throw own.error;
+      if (!own.data || own.data.status !== 'pending' || own.data.payment_status !== 'pending') return json(res, 403, { error: 'Modification de cette commande refusee.' });
+    }
+    let deletion = supabase.from('orders').delete().eq('id', id);
+    if (!actor.profile.is_admin) deletion = deletion.eq('email', actor.profile.email).eq('status', 'pending').eq('payment_status', 'pending');
+    const { error } = await deletion;
     if (error) throw error;
     await addSecurityLog(supabase, req, `Commande supprimee: ${id}`, 'SECURED');
     return json(res, 200, { success: true });
@@ -325,9 +355,10 @@ async function handleOrders(req: any, res: any, supabase: any) {
 
   if (req.method === 'PUT') {
     if (!id) return json(res, 400, { error: 'ID commande requis.' });
+    if (!actor.profile.is_admin) return json(res, 403, { error: 'Acces refuse.' });
     const body = await readBody(req);
     const status = String(body.status || '').trim();
-    if (!status) return json(res, 400, { error: 'Statut requis.' });
+    if (!['pending', 'shipped', 'delivered', 'cancelled'].includes(status)) return json(res, 400, { error: 'Statut invalide.' });
     const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select('*').single();
     if (error) throw error;
     await addSecurityLog(supabase, req, `Commande ${id} mise a jour: ${status}`, 'SECURED');
@@ -351,7 +382,7 @@ async function handleReviews(req: any, res: any, supabase: any) {
   }
 
   if (req.method === 'POST') {
-    if (!rateLimit(req, res, 'reviews', 5, 60_000)) return;
+    if (!await rateLimit(req, res, 'reviews', 5, 60_000)) return;
     const body = await readBody(req);
     const customerName = cleanText(body.customerName || body.name, 80);
     const text = cleanText(body.text || body.comment, 1000);
@@ -401,7 +432,7 @@ async function handleReviews(req: any, res: any, supabase: any) {
 
 async function handleMessage(req: any, res: any, supabase: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-  if (!rateLimit(req, res, 'messages', 6, 60_000)) return;
+  if (!await rateLimit(req, res, 'messages', 6, 60_000)) return;
   const body = await readBody(req);
   const kind = cleanText(req.query?.kind || body.kind || 'contact', 24);
   const name = cleanText(body.name || body.customerName || 'Client StevenBmj', 80);
@@ -436,7 +467,7 @@ async function handleMessage(req: any, res: any, supabase: any) {
 
 async function handleNewsletter(req: any, res: any, supabase: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-  if (!rateLimit(req, res, 'newsletter', 4, 60_000)) return;
+  if (!await rateLimit(req, res, 'newsletter', 4, 60_000)) return;
   const body = await readBody(req);
   const email = String(body.email || '').trim().toLowerCase();
   if (!EMAIL_RE.test(email)) return json(res, 400, { error: 'Adresse e-mail invalide.' });
@@ -450,9 +481,13 @@ async function handleNewsletter(req: any, res: any, supabase: any) {
   return json(res, 200, { success: true });
 }
 
-async function handleAnalytics(req: any, res: any) {
+async function handleAnalytics(req: any, res: any, supabase: any) {
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
-  return json(res, 200, analyticsRows(String(req.query?.filter || 'week')));
+  let period;
+  try { period = periodRange(req.query || {}); }
+  catch { return json(res, 400, { error: 'Periode invalide.' }); }
+  const { rows, truncated } = await readReportOrders(supabase, period);
+  return json(res, 200, salesReport(rows, period, truncated));
 }
 
 async function handleAnnouncements(req: any, res: any, supabase: any) {
@@ -522,7 +557,7 @@ async function handleSecurityLogs(req: any, res: any, supabase: any) {
 
 async function handleVipMessage(req: any, res: any, supabase: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-  if (!rateLimit(req, res, 'vip-message', 10, 60_000)) return;
+  if (!await rateLimit(req, res, 'vip-message', 10, 60_000)) return;
   const body = await readBody(req);
   const customerName = cleanText(body.customerName || body.name || 'Client VIP', 100);
   const email = String(body.email || '').trim().toLowerCase();
@@ -563,19 +598,40 @@ async function handleVipMessage(req: any, res: any, supabase: any) {
 
 export default async function handler(req: any, res: any) {
   try {
+    if (!assertSameOrigin(req, res)) return;
     const resource = String(req.query?.resource || '').trim();
+    const adminOnly = ['analytics', 'security-logs', 'vip-message'].includes(resource)
+      || (['promos', 'announcements'].includes(resource) && req.method !== 'GET')
+      || (resource === 'promos' && req.method === 'GET' && !req.query?.code)
+      || (resource === 'reviews' && (req.query?.scope === 'admin' || ['PUT', 'DELETE'].includes(req.method) || req.query?.action === 'approve'));
+    if (adminOnly || resource === 'orders') {
+      req.actor = await requireUser(req, res, adminOnly);
+      if (!req.actor) return;
+    }
     const supabase = supabaseAdmin();
-    if (resource === 'promos') return handlePromos(req, res, supabase);
-    if (resource === 'orders') return handleOrders(req, res, supabase);
-    if (resource === 'reviews') return handleReviews(req, res, supabase);
-    if (resource === 'analytics') return handleAnalytics(req, res);
-    if (resource === 'announcements') return handleAnnouncements(req, res, supabase);
-    if (resource === 'security-logs') return handleSecurityLogs(req, res, supabase);
-    if (resource === 'vip-message') return handleVipMessage(req, res, supabase);
-    if (resource === 'message') return handleMessage(req, res, supabase);
-    if (resource === 'newsletter') return handleNewsletter(req, res, supabase);
+    if (resource === 'invoice-verify') {
+      if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+      if (!await authRateLimit(req, res, 'invoice-verify', 30, 300)) return;
+      const token = String(req.query?.token || '');
+      if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(token)) return json(res, 400, { error: 'Reference invalide.' });
+      const result = await supabase.from('orders').select('id,total_price,currency,date,status,payment_status').eq('invoice_token', token).maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) return json(res, 404, { error: 'Facture introuvable.' });
+      const order = result.data;
+      return json(res, 200, { id: order.id, totalPrice: Number(order.total_price), currency: order.currency,
+        date: order.date, status: order.status, paymentStatus: order.payment_status || 'unknown' });
+    }
+    if (resource === 'promos') return await handlePromos(req, res, supabase);
+    if (resource === 'orders') return await handleOrders(req, res, supabase);
+    if (resource === 'reviews') return await handleReviews(req, res, supabase);
+    if (resource === 'analytics') return await handleAnalytics(req, res, supabase);
+    if (resource === 'announcements') return await handleAnnouncements(req, res, supabase);
+    if (resource === 'security-logs') return await handleSecurityLogs(req, res, supabase);
+    if (resource === 'vip-message') return await handleVipMessage(req, res, supabase);
+    if (resource === 'message') return await handleMessage(req, res, supabase);
+    if (resource === 'newsletter') return await handleNewsletter(req, res, supabase);
     return json(res, 404, { error: 'Ressource introuvable.' });
   } catch (error: any) {
-    return json(res, 500, { error: 'Erreur serveur boutique', message: error?.message || String(error) });
+    return json(res, 500, { error: 'Erreur serveur boutique' });
   }
 }
