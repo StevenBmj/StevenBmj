@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { handleWorkflow, workflowResources, workflowOrder } from '../src/server/workflows';
+import { queuePush } from '../src/server/push';
+import { exchangeRates } from '../src/server/exchangeRates';
 import { randomUUID } from 'node:crypto';
 import { periodRange, readReportOrders, salesReport } from '../src/server/reports';
-import { assertSameOrigin, authRateLimit, readJson, requireUser } from '../src/server/security';
+import { assertSameOrigin, authRateLimit, readJson, requireUser, recordSecurityEvent } from '../src/server/security';
+import { sendEmail } from './_supabase';
+import { handleVipMessage } from '../src/server/vipMessages';
 
 function json(res: any, status: number, body: any) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -13,10 +18,6 @@ function json(res: any, status: number, body: any) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[\p{L}' -]{2,80}$/u;
 const PHONE_RE = /^\+[1-9]\d{6,18}$/;
-function clientIp(req: any) {
-  return String(process.env.VERCEL === '1' ? req.headers['x-vercel-forwarded-for'] || 'unknown' : req.socket?.remoteAddress || 'local').split(',')[0].trim();
-}
-
 async function rateLimit(req: any, res: any, scope: string, limit = 20, windowMs = 60_000) {
   return authRateLimit(req, res, scope, limit, Math.ceil(windowMs / 1000));
 }
@@ -36,25 +37,6 @@ function escapeHtml(value: any) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-async function sendEmail(to: string, subject: string, html: string) {
-  if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) return false;
-  const nodemailer = (await import('nodemailer')).default;
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_APP_PASSWORD },
-  });
-  await transporter.sendMail({
-    from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
-  return true;
 }
 
 function conciergeEmail() {
@@ -83,6 +65,7 @@ function rowToPromo(row: any) {
 
 function rowToOrder(row: any) {
   return {
+    ...workflowOrder(row),
     id: row.id,
     customerName: row.customer_name,
     whatsapp: row.whatsapp,
@@ -128,21 +111,18 @@ function rowToSecurityLog(row: any) {
   const date = row.timestamp ? new Date(row.timestamp) : new Date();
   return {
     id: row.id,
-    timestamp: date.toLocaleString('fr-FR'),
+    timestamp: date.toISOString(),
     ip: row.ip || '127.0.0.1',
     event: row.event || '',
     status: row.status || 'SECURED',
+    country: row.country || null,
+    city: row.city || null,
+    archivedAt: row.archived_at || null,
   };
 }
 
 async function addSecurityLog(supabase: any, req: any, event: string, status = 'SECURED') {
-  await supabase.from('security_logs').insert({
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    timestamp: new Date().toISOString(),
-    ip: clientIp(req),
-    event: cleanText(event, 300),
-    status,
-  }).then(() => null, () => null);
+  await recordSecurityEvent(req, event, status);
 }
 
 
@@ -310,6 +290,7 @@ async function handleOrders(req: any, res: any, supabase: any) {
     };
     const row = {
       id: orderId,
+      ...(editing ? { workflow_version: Number(existing?.workflow_version || 0) + 1 } : {}),
       customer_name: customerName,
       whatsapp,
       email,
@@ -335,34 +316,19 @@ async function handleOrders(req: any, res: any, supabase: any) {
     if (error) throw error;
     if (!data) return json(res, 409, { error: 'La commande a change. Actualisez avant de reessayer.' });
     await addSecurityLog(supabase, req, `Nouvelle commande ${orderId} - ${customerName}`, 'SECURED');
+    await queuePush(supabase);
     return json(res, 200, { success: true, order: rowToOrder(data) });
   }
 
   if (req.method === 'DELETE') {
     if (!id) return json(res, 400, { error: 'ID commande requis.' });
-    if (!actor.profile.is_admin) {
-      const own = await supabase.from('orders').select('id,status,email,payment_status').eq('id', id).eq('email', actor.profile.email).maybeSingle();
-      if (own.error) throw own.error;
-      if (!own.data || own.data.status !== 'pending' || own.data.payment_status !== 'pending') return json(res, 403, { error: 'Modification de cette commande refusee.' });
-    }
-    let deletion = supabase.from('orders').delete().eq('id', id);
-    if (!actor.profile.is_admin) deletion = deletion.eq('email', actor.profile.email).eq('status', 'pending').eq('payment_status', 'pending');
-    const { error } = await deletion;
-    if (error) throw error;
-    await addSecurityLog(supabase, req, `Commande supprimee: ${id}`, 'SECURED');
-    return json(res, 200, { success: true });
+    return json(res, 403, { error: 'Les commandes ne sont pas effacees. Utilisez l’annulation ou l’archivage du suivi de commande.' });
   }
 
   if (req.method === 'PUT') {
     if (!id) return json(res, 400, { error: 'ID commande requis.' });
     if (!actor.profile.is_admin) return json(res, 403, { error: 'Acces refuse.' });
-    const body = await readBody(req);
-    const status = String(body.status || '').trim();
-    if (!['pending', 'shipped', 'delivered', 'cancelled'].includes(status)) return json(res, 400, { error: 'Statut invalide.' });
-    const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select('*').single();
-    if (error) throw error;
-    await addSecurityLog(supabase, req, `Commande ${id} mise a jour: ${status}`, 'SECURED');
-    return json(res, 200, { success: true, order: rowToOrder(data) });
+    return json(res, 409, { error: 'Utilisez le parcours de livraison pour conserver les validations et la preuve de remise.' });
   }
 
   return json(res, 405, { error: 'Method not allowed' });
@@ -384,7 +350,7 @@ async function handleReviews(req: any, res: any, supabase: any) {
   if (req.method === 'POST') {
     if (!await rateLimit(req, res, 'reviews', 5, 60_000)) return;
     const body = await readBody(req);
-    const customerName = cleanText(body.customerName || body.name, 80);
+    const customerName = cleanText(req.actor.profile.name, 80);
     const text = cleanText(body.text || body.comment, 1000);
     const rating = Math.max(1, Math.min(5, Number(body.rating || 5)));
     if (!NAME_RE.test(customerName) || /\d/.test(customerName)) {
@@ -537,78 +503,47 @@ async function handleAnnouncements(req: any, res: any, supabase: any) {
 
 async function handleSecurityLogs(req: any, res: any, supabase: any) {
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    let query = supabase
       .from('security_logs')
       .select('*')
       .order('timestamp', { ascending: false })
-      .limit(150);
+      .limit(1000);
+    if (req.query?.archived !== '1') query = query.is('archived_at', null);
+    const { data, error } = await query;
     if (error) throw error;
     return json(res, 200, (data || []).map(rowToSecurityLog));
   }
 
   if (req.method === 'DELETE') {
-    const { error } = await supabase.from('security_logs').delete().neq('id', '__never__');
+    const { error } = await supabase.from('security_logs').update({ archived_at: new Date().toISOString() }).is('archived_at', null);
     if (error) throw error;
+    await addSecurityLog(supabase, req, 'Security history archived by administrator', 'SECURED');
     return json(res, 200, { success: true, logs: [] });
   }
 
   return json(res, 405, { error: 'Method not allowed' });
 }
 
-async function handleVipMessage(req: any, res: any, supabase: any) {
-  if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-  if (!await rateLimit(req, res, 'vip-message', 10, 60_000)) return;
-  const body = await readBody(req);
-  const customerName = cleanText(body.customerName || body.name || 'Client VIP', 100);
-  const email = String(body.email || '').trim().toLowerCase();
-  const whatsappDigits = String(body.whatsapp || '').replace(/\D/g, '');
-  const message = cleanText(body.message, 1500);
-
-  if (!message || message.length < 3) return json(res, 400, { error: 'Message VIP requis.' });
-  if (email && !EMAIL_RE.test(email)) return json(res, 400, { error: 'Adresse e-mail VIP invalide.' });
-  if (!email && !whatsappDigits) return json(res, 400, { error: 'Ajoutez un e-mail ou un numero WhatsApp pour ce client.' });
-
-  const whatsappText = `*STEVENBMJ*\n━━━━━━━━━━━━━━━━\nCher(e) *${customerName}*,\n\n${message}\n\nStevenBmj - Conciergerie Royale`;
-  const whatsappUrl = whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(whatsappText)}` : '';
-  let emailSent = false;
-  if (email) {
-    emailSent = await sendEmail(
-      email,
-      'Message prive Maison StevenBmj',
-      `
-        <div style="font-family:Arial,sans-serif;background:#050505;color:#f5f5f5;padding:24px;border:1px solid #d97706;">
-          <p style="color:#d97706;font-weight:bold;letter-spacing:.18em;">STEVENBMJ HAUTE COUTURE</p>
-          <p>Cher/Chere ${escapeHtml(customerName)},</p>
-          <p>${escapeHtml(message)}</p>
-          <p style="color:#999;margin-top:24px;">StevenBmj - Conciergerie Royale</p>
-        </div>
-      `
-    ).catch(() => false);
-  }
-
-  await sendEmail(
-    conciergeEmail(),
-    `Copie message VIP StevenBmj - ${customerName}`,
-    `<p><strong>Client :</strong> ${escapeHtml(customerName)}</p><p><strong>Email :</strong> ${escapeHtml(email || 'Non renseigne')}</p><p><strong>WhatsApp :</strong> ${escapeHtml(whatsappDigits || 'Non renseigne')}</p><p>${escapeHtml(message)}</p>`
-  ).catch(() => false);
-  await addSecurityLog(supabase, req, `Message VIP dual prepare pour ${customerName}`, 'SECURED');
-
-  return json(res, 200, { success: true, emailSent, whatsappUrl });
-}
 
 export default async function handler(req: any, res: any) {
   try {
     if (!assertSameOrigin(req, res)) return;
     const resource = String(req.query?.resource || '').trim();
-    const adminOnly = ['analytics', 'security-logs', 'vip-message'].includes(resource)
+    const adminOnly = ['analytics', 'security-logs', 'vip-message', 'drivers', 'ledger'].includes(resource)
       || (['promos', 'announcements'].includes(resource) && req.method !== 'GET')
       || (resource === 'promos' && req.method === 'GET' && !req.query?.code)
       || (resource === 'reviews' && (req.query?.scope === 'admin' || ['PUT', 'DELETE'].includes(req.method) || req.query?.action === 'approve'));
-    if (adminOnly || resource === 'orders') {
+    if (adminOnly || resource === 'orders' || (resource === 'reviews' && req.method === 'POST') || workflowResources.has(resource)) {
       req.actor = await requireUser(req, res, adminOnly);
       if (!req.actor) return;
     }
     const supabase = supabaseAdmin();
+    if (resource === 'rates') {
+      if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+      if (!await authRateLimit(req, res, 'exchange-rates', 30, 300)) return;
+      return json(res, 200, await exchangeRates(supabase));
+    }
+    if (workflowResources.has(resource)) return await handleWorkflow(req, res, req.actor);
     if (resource === 'invoice-verify') {
       if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
       if (!await authRateLimit(req, res, 'invoice-verify', 30, 300)) return;

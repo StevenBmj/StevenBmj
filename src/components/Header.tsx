@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
+import NotificationBell from './NotificationBell';
 import { ShoppingBag, Heart, ShieldAlert, Languages, Coins, Menu, X, Landmark, User, LogOut, Key, Trash2 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,6 +21,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
     language, 
     setLanguage, 
     currency, 
+    exchangeInfo,
     setCurrency, 
     cart, 
     setCartOpen, 
@@ -160,7 +162,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
   };
 
   const cycleCurrency = () => {
-    const sequence: ('EUR' | 'CFA' | 'USD')[] = ['EUR', 'CFA', 'USD'];
+    const sequence: ('EUR' | 'CFA' | 'USD')[] = exchangeInfo.usd ? ['EUR', 'CFA', 'USD'] : ['EUR', 'CFA'];
     const idx = sequence.indexOf(currency);
     setCurrency(sequence[(idx + 1) % sequence.length]);
   };
@@ -235,10 +237,10 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             id="btn-currency"
             onClick={cycleCurrency}
             className="hidden xl:flex items-center space-x-1 px-2.5 py-1 text-neutral-400 hover:text-white hover:border-white border border-neutral-800 bg-neutral-900/40 rounded text-[10px] font-mono uppercase tracking-widest duration-500 cursor-pointer"
-            title={language === 'FR' ? 'Devise' : 'Currency'}
+            title={`${language === 'FR' ? 'Conversion indicative' : 'Indicative conversion'}${exchangeInfo.asOf ? ` · ${exchangeInfo.asOf}` : ''}${exchangeInfo.stale ? (language === 'FR' ? ' · dernier taux disponible' : ' · last available rate') : ''}`}
           >
             <Coins className="w-3.5 h-3.5 text-amber-500/85" />
-            <span>{currency}</span>
+            <span>{currency === 'USD' && !exchangeInfo.usd ? 'EUR' : currency}</span>
           </button>
 
           {/* Language selector (Desktop only) */}
@@ -350,6 +352,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
           </div>
 
           {/* Wishlist triggers */}
+          <NotificationBell />
           <button
             id="btn-wishlist"
             onClick={onOpenWishlist}
@@ -443,6 +446,8 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
                 </div>
                 
                 <div className="flex flex-col space-y-2">
+                  <button onClick={() => { setView('account'); setMobileMenuOpen(false); }} className="min-h-11 rounded border border-white/15 px-3 text-left text-sm">{language === 'FR' ? 'Mes commandes' : 'My orders'}</button>
+                  <button onClick={() => { setView('driver'); setMobileMenuOpen(false); }} className="min-h-11 rounded border border-white/15 px-3 text-left text-sm">{language === 'FR' ? 'Espace livreur' : 'Driver workspace'}</button>
                   {user.isAdmin && (
                     <button
                       onClick={() => {
@@ -509,6 +514,7 @@ export default function Header({ currentView, setView, onOpenWishlist }: HeaderP
             )}
 
             {/* Language & Currency controls on mobile */}
+            <p className="text-xs text-neutral-400">{language === 'FR' ? 'Conversions indicatives' : 'Indicative conversions'}{exchangeInfo.asOf ? ` · ${exchangeInfo.asOf}` : ''}{exchangeInfo.stale ? (language === 'FR' ? ' · taux récent indisponible' : ' · latest rate unavailable') : ''}</p>
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 onClick={cycleCurrency}

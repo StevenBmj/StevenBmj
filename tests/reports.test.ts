@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { periodRange, salesReport } from '../src/server/reports';
-import shop from '../api/shop';
+import shop from '../serverless/shop';
 import { ADMIN_ID, CLIENT_ID, fakeSupabase, invoke, sessionHeaders } from './helpers/api';
 
 test('sales periods use Benin dates and compare an equal preceding period', () => {

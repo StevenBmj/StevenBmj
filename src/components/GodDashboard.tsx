@@ -5,12 +5,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { useNavigation } from '../context/NavigationContext';
+import { useNotifications } from '../context/NotificationsContext';
+import type { AdminSection } from '../lib/navigation';
 import { apiFetch as fetch } from '../lib/api';
 import { Product, Order, PromoCode, AppSettings } from '../types';
 import Logo from './Logo';
 import InvoicePreview from './InvoicePreview';
 import AssistantSettings from './AssistantSettings';
 import SalesReports from './SalesReports';
+import OrderWorkspace from './OrderWorkspace';
+import DriverManagement from './DriverManagement';
+import LedgerReports from './LedgerReports';
+import SecurityConsole from './SecurityConsole';
+import VipMessageComposer from './VipMessageComposer';
 import type { InvoiceFile } from '../lib/invoicePdf';
 import { 
   BarChart, Sparkles, Plus, Edit2, Trash2, Tag, Percent, 
@@ -23,7 +31,10 @@ export default function GodDashboard() {
   const { language, formatPrice, user, setUser, logout, authLoading, setAuthModalOpen, fetchProducts, fetchSettings } = useApp();
   
   // Tabs of "God" dashboard
-  const [activeTab, setActiveTab] = useState<'analytics' | 'products' | 'orders' | 'promos' | 'users' | 'settings' | 'security' | 'announcements' | 'reviews' | 'assistants'>('analytics');
+  const { route, navigate } = useNavigation();
+  const { sections: sectionNotifications, markSectionRead } = useNotifications();
+  const [activeTab, setActiveTab] = useState<AdminSection>(route.adminSection || (route.orderId ? 'orders' : 'analytics'));
+  useEffect(() => { setActiveTab(route.adminSection || (route.orderId ? 'orders' : 'analytics')); }, [route.adminSection, route.orderId]);
   
   // Security authentications
   const isAuthorized = user?.isAdmin === true;
@@ -34,19 +45,6 @@ export default function GodDashboard() {
   const [showAdminLoginPassword, setShowAdminLoginPassword] = useState(false);
   const [showAdminRecoverPassword, setShowAdminRecoverPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
-
-  // Notifications system per administrative section
-  const [sectionNotifications, setSectionNotifications] = useState<{ [key: string]: number }>({
-    analytics: 0,
-    products: 0,
-    orders: 0,
-    promos: 0,
-    users: 0,
-    settings: 0,
-    security: 0,
-    announcements: 0,
-    reviews: 0,
-  });
 
   // Data State synced from server API
   const [products, setProducts] = useState<Product[]>([]);
@@ -241,14 +239,6 @@ export default function GodDashboard() {
       console.error("Error loaded admin dashboard data", err);
     }
   };
-
-  useEffect(() => {
-    const pendingCount = reviewsList.filter(r => r.status === 'pending').length;
-    setSectionNotifications(prev => ({
-      ...prev,
-      reviews: pendingCount
-    }));
-  }, [reviewsList]);
 
   useEffect(() => {
     if (isAuthorized) void fetchAllGodData();
@@ -493,41 +483,6 @@ export default function GodDashboard() {
     });
   };
 
-  // Send dual VIP message by email and open WhatsApp with prepared content
-  const handleSendDualVipMessage = async (vip: any) => {
-    if (!vipMsgBody.trim()) return;
-    setVipMsgError('');
-    setVipMsgLoading(true);
-    try {
-      const res = await fetch('/api/vip-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName: vip.customerName,
-          email: vip.email,
-          whatsapp: vip.whatsapp,
-          message: vipMsgBody,
-        })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Transmission impossible.");
-      setSelectedVipForMsg(vip);
-      setVipMsgSuccess(true);
-      if (data.whatsappUrl) {
-        window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
-      }
-      fetchAllGodData();
-      setTimeout(() => {
-        setVipMsgSuccess(false);
-        setVipMsgBody('');
-        setSelectedVipForMsg(null);
-      }, 6000);
-    } catch (err: any) {
-      setVipMsgError(err.message || "Transmission impossible.");
-    } finally {
-      setVipMsgLoading(false);
-    }
-  };
 
   // Announcements forms actions
   const handleAnnounceSubmit = async (e: React.FormEvent) => {
@@ -948,26 +903,25 @@ export default function GodDashboard() {
         {/* Navigation Admin Controls Menus sidebar */}
         <div className="lg:col-span-1 space-y-2">
           {[
-            { id: 'analytics', label: 'ANALYTICS PRESTIGE', icon: <BarChart className="w-4 h-4" /> },
-            { id: 'products', label: 'GESTION PRODUITS', icon: <Layers className="w-4 h-4" /> },
-            { id: 'orders', label: 'GESTION COMMANDES', icon: <CheckSquare className="w-4 h-4" /> },
-            { id: 'promos', label: 'CODES PROMOTIONS', icon: <Percent className="w-4 h-4" /> },
-            { id: 'announcements', label: 'ANNONCES GENERALES', icon: <Megaphone className="w-4 h-4 text-red-400" /> },
-            { id: 'users', label: 'CLIENTÈLE VIP', icon: <Users className="w-4 h-4 text-amber-400" /> },
-            { id: 'reviews', label: 'AVIS CLIENTÈLE', icon: <MessageSquare className="w-4 h-4 text-emerald-400" /> },
-            { id: 'settings', label: 'CONFIGURATION SITE', icon: <Settings className="w-4 h-4" /> },
+            { id: 'analytics', label: language === 'FR' ? 'RAPPORTS DE VENTES' : 'SALES REPORTS', icon: <BarChart className="w-4 h-4" /> },
+            { id: 'products', label: language === 'FR' ? 'GESTION PRODUITS' : 'PRODUCTS', icon: <Layers className="w-4 h-4" /> },
+            { id: 'orders', label: language === 'FR' ? 'COMMANDES ET LIVRAISONS' : 'ORDERS AND DELIVERIES', icon: <CheckSquare className="w-4 h-4" /> },
+            { id: 'drivers', label: language === 'FR' ? 'LIVREURS' : 'DRIVERS', icon: <Users className="w-4 h-4" /> },
+            { id: 'ledger', label: language === 'FR' ? 'COMPTABILITÉ' : 'ACCOUNTING', icon: <BarChart className="w-4 h-4" /> },
+            { id: 'promos', label: language === 'FR' ? 'CODES PROMOTIONS' : 'PROMOTIONS', icon: <Percent className="w-4 h-4" /> },
+            { id: 'announcements', label: language === 'FR' ? 'ANNONCES GÉNÉRALES' : 'ANNOUNCEMENTS', icon: <Megaphone className="w-4 h-4 text-red-400" /> },
+            { id: 'users', label: language === 'FR' ? 'CLIENTÈLE VIP' : 'VIP CUSTOMERS', icon: <Users className="w-4 h-4 text-amber-400" /> },
+            { id: 'reviews', label: language === 'FR' ? 'AVIS CLIENTÈLE' : 'CUSTOMER REVIEWS', icon: <MessageSquare className="w-4 h-4 text-emerald-400" /> },
+            { id: 'settings', label: language === 'FR' ? 'CONFIGURATION SITE' : 'SITE SETTINGS', icon: <Settings className="w-4 h-4" /> },
             { id: 'assistants', label: language === 'FR' ? 'ASSISTANTS & API' : 'ASSISTANTS & API', icon: <Sparkles className="w-4 h-4" /> },
-            { id: 'security', label: 'CYBER PARE-FEU', icon: <ShieldAlert className="w-4 h-4" /> },
+            { id: 'security', label: language === 'FR' ? 'SÉCURITÉ' : 'SECURITY', icon: <ShieldAlert className="w-4 h-4" /> },
           ].map((item) => (
             <button
               id={`btn-admin-tab-${item.id}`}
               key={item.id}
               onClick={() => {
-                setActiveTab(item.id as any);
-                setSectionNotifications(prev => ({
-                  ...prev,
-                  [item.id]: 0
-                }));
+                navigate({ view: 'god', panel: null, adminSection: item.id as AdminSection });
+                if (sectionNotifications[item.id]) void markSectionRead(item.id).catch(() => alert(language === 'FR' ? 'Lecture des notifications non enregistrée.' : 'Notifications could not be marked as read.'));
               }}
               className={`w-full py-3 px-4 rounded text-xs text-left uppercase tracking-wider duration-350 cursor-pointer flex items-center ${
                 activeTab === item.id 
@@ -1007,6 +961,8 @@ export default function GodDashboard() {
           {/* TAB 1: ANALYTICS PREMIUM */}
           {activeTab === 'assistants' && <AssistantSettings />}
           {activeTab === 'analytics' && <SalesReports />}
+          {activeTab === 'drivers' && <DriverManagement />}
+          {activeTab === 'ledger' && <LedgerReports />}
 
           {/* TAB 2: PRODUCTS MANAGER */}
           {activeTab === 'products' && (
@@ -1320,131 +1276,7 @@ export default function GodDashboard() {
             </div>
           )}
 
-          {/* TAB 3: ORDERS SECURE MONITOR */}
-          {activeTab === 'orders' && (() => {
-            const filteredOrders = orders.filter(ord => {
-              const q = invoiceSearchQuery.toLowerCase().trim();
-              if (!q) return true;
-              return ord.id.toLowerCase().includes(q) || ord.customerName.toLowerCase().includes(q);
-            });
-
-            return (
-              <div className="space-y-6 animate-fade-in">
-                
-                <div className="border-b border-white/5 pb-4">
-                  <h3 className="text-sm font-semibold text-white uppercase tracking-widest">
-                    JOURNAL DE COMMANDES ET DE FACTURATIONS ({filteredOrders.length} / {orders.length})
-                  </h3>
-                  <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                    Isolé sécurisé aux serveurs de production
-                  </p>
-                </div>
-
-                {/* Filtre de recherche de factures */}
-                <div className="bg-neutral-950 p-4 border border-white/10 rounded flex items-center space-x-3">
-                  <span className="text-amber-500 font-mono text-xs">🔍 SCAN/RECHERCHE:</span>
-                  <input
-                    id="invoice-admin-search-input"
-                    type="text"
-                    value={invoiceSearchQuery}
-                    onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                    placeholder="Saisissez un nom de client ou un numéro de facture (ID) pour filtrer..."
-                    className="w-full bg-transparent border-none text-xs text-white focus:outline-none focus:ring-0 placeholder-neutral-750 font-mono"
-                  />
-                  {invoiceSearchQuery && (
-                    <button
-                      onClick={() => setInvoiceSearchQuery('')}
-                      className="text-neutral-550 hover:text-white font-mono text-xs uppercase cursor-pointer"
-                    >
-                      [Effacer]
-                    </button>
-                  )}
-                </div>
-
-                {filteredOrders.length === 0 ? (
-                  <div className="text-center py-20 text-neutral-600 font-mono text-xs uppercase border border-dashed border-white/5">
-                    Aucune facture ne correspond aux critères de recherche.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredOrders.map((ord) => (
-                      <div key={ord.id} className="bg-neutral-950 p-5 rounded-lg border border-white/5 space-y-4 font-mono text-left">
-                        
-                        {/* Order top line status */}
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center text-xs gap-3">
-                          <div className="space-y-0.5">
-                            <p className="text-white font-bold uppercase">RÉFÉRENCE COMMANDE : {ord.id}</p>
-                            <p className="text-neutral-500 text-[10px]">Date : {new Date(ord.date).toLocaleString('fr-FR')}</p>
-                          </div>
-                          
-                          {/* Status controllers selection options */}
-                          <div className="flex items-center space-x-3">
-                            <span className="text-[9px] text-neutral-500 uppercase">STATUT :</span>
-                            <select
-                              id={`status-selector-${ord.id}`}
-                              value={ord.status}
-                              onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
-                              className={`text-[10px] font-bold px-2 py-1 bg-black rounded border cursor-pointer select-none ${
-                                ord.status === 'delivered' ? 'text-emerald-400 border-emerald-500/20' :
-                                ord.status === 'shipped' ? 'text-sky-400 border-sky-500/20' :
-                                ord.status === 'cancelled' ? 'text-red-400 border-red-500/20' :
-                                'text-amber-400 border-amber-500/20'
-                              }`}
-                            >
-                              <option value="pending">En attente (Pending)</option>
-                              <option value="shipped">Expédiée (Shipped)</option>
-                              <option value="delivered">Livrée (Delivered)</option>
-                              <option value="cancelled">Annulée (Cancelled)</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Client Delivery details */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-neutral-400 border-y border-white/5 py-3">
-                          <div>
-                            <p className="text-neutral-500 text-[9px] tracking-widest uppercase">COORDONNÉES CLIENT</p>
-                            <p className="text-white font-bold">{ord.customerName}</p>
-                            <p>WhatsApp: {ord.whatsapp}</p>
-                            <p>Lieu: {ord.address}, {ord.city}</p>
-                          </div>
-
-                          <div>
-                            <p className="text-neutral-500 text-[9px] tracking-widest uppercase">SÉLECTION D'EXCEPTION</p>
-                            {ord.items.map((it, idx) => (
-                              <p key={idx} className="text-white text-[11px] leading-relaxed">
-                                - {it.quantity}x {it.productName} {it.selectedSize ? `(TSize: ${it.selectedSize})` : ''} ({formatPrice(it.price)})
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Bottom values calculate */}
-                        <div className="flex justify-between items-center pt-1 text-xs">
-                          <span className="text-neutral-500">VALEUR COMMANDE :</span>
-                          <span className="text-yellow-400 font-bold text-base filter drop-shadow-[0_0_8px_rgba(250,204,21,0.15)]">
-                            {formatPrice(ord.totalPrice)}
-                          </span>
-                        </div>
-
-                        {/* Action de Facturation */}
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-3 border-t border-white/5 gap-3">
-                          <span className="text-[10px] text-neutral-500 uppercase font-mono">Imprimerie & Audits :</span>
-                          <button
-                            onClick={() => setSelectedOrderForInvoice(ord)}
-                            className="px-4 py-2 bg-neutral-900 border border-amber-500/20 text-amber-500 hover:text-black hover:bg-amber-500 rounded text-[10px] font-bold uppercase tracking-wider duration-300 font-mono cursor-pointer flex items-center space-x-1"
-                          >
-                            <span>📋 IMPRIMER / CHARGER LE REÇU DE FACTURATION</span>
-                          </button>
-                        </div>
-
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-              </div>
-            );
-          })()}
+          {activeTab === 'orders' && <OrderWorkspace role="admin" />}
 
           {/* TAB 4: PROMOTIONS */}
           {activeTab === 'promos' && (
@@ -1751,138 +1583,7 @@ export default function GodDashboard() {
                   </form>
                 )}
 
-                {/* DUAL SIMULTANEOUS MESSAGING MODAL / PANEL */}
-                {selectedVipForMsg && (
-                  <div className="bg-neutral-900 border border-slate-700/50 p-6 rounded-xl space-y-6 animate-fade-in relative overflow-hidden">
-                    {/* Glowing corner indicators */}
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/10 to-transparent blur-xl" />
-                    
-                    <div className="flex justify-between items-start border-b border-white/10 pb-3">
-                      <div>
-                        <span className="text-[9px] font-mono bg-amber-500/10 text-amber-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                          CONCIERGERIE STEVENBMJ - DOUBLE DIFFUSION SIMULTANÉE
-                        </span>
-                        <h4 className="text-sm font-semibold text-white uppercase mt-1">
-                          Rédaction de message d'exception pour : {selectedVipForMsg.customerName}
-                        </h4>
-                      </div>
-                      <button
-                        onClick={() => setSelectedVipForMsg(null)}
-                        className="text-neutral-500 hover:text-white font-mono text-xs cursor-pointer uppercase"
-                      >
-                        [Fermer l'Atelier]
-                      </button>
-                    </div>
-
-                    {vipMsgSuccess ? (
-                      <div className="p-6 bg-emerald-950/40 border border-emerald-500/20 rounded text-center space-y-3">
-                        <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto animate-bounce" />
-                        <h5 className="text-emerald-400 font-bold font-mono text-xs uppercase">CRÉATION SIGNÉE & DISPATCHÉE AVEC SUCCÈS !</h5>
-                        <p className="text-[10px] text-neutral-400 max-w-md mx-auto uppercase leading-relaxed font-mono">
-                          Les algorithmes de la plateforme ont orchestré la double transmission chiffrée.
-                        </p>
-                        
-                        {/* Two visual tubes/pipes representing dispatch */}
-                        <div className="grid grid-cols-2 gap-4 pt-3 font-mono">
-                          <div className="bg-neutral-950 p-3 rounded border border-sky-500/20 text-left">
-                            <p className="text-sky-400 font-bold text-[9px] uppercase flex items-center space-x-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse mr-1" />
-                              WhatsApp Pipeline
-                            </p>
-                            <p className="text-[8px] text-neutral-500 mt-1">STATUT: DELIVERED TO {selectedVipForMsg.whatsapp}</p>
-                            <p className="text-[9px] text-neutral-300 italic mt-2 line-clamp-2">
-                              "Cher(e) *{selectedVipForMsg.customerName}*, {vipMsgBody}..."
-                            </p>
-                          </div>
-                          
-                          <div className="bg-neutral-950 p-3 rounded border border-indigo-500/20 text-left">
-                            <p className="text-indigo-400 font-bold text-[9px] uppercase flex items-center space-x-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse mr-1" />
-                              Haute Couture E-Mail
-                            </p>
-                            <p className="text-[8px] text-neutral-500 mt-1">STATUT: SENT BY StevenBmj TO {selectedVipForMsg.email || 'concierge@vip.fr'}</p>
-                            <p className="text-[9px] text-neutral-300 italic mt-2 line-clamp-2">
-                              "✨ STEVENBMJ HAUTE COUTURE ✨ Cher/Chère {selectedVipForMsg.customerName}..."
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-mono text-neutral-500 uppercase block">Mon Message (Le contenu de base qui sera mis en forme) *</label>
-                          <textarea
-                            required
-                            rows={3}
-                            value={vipMsgBody}
-                            onChange={(e) => setVipMsgBody(e.target.value)}
-                            placeholder="Saisissez votre note d'élégance ou votre invitation privée..."
-                            className="w-full bg-neutral-950 border border-white/10 text-xs px-3 py-2.5 text-white focus:border-amber-450 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Dual template side-by-side previews */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* WhatsApp Template Form */}
-                          <div className="p-4 bg-lime-950/20 border border-lime-500/20 rounded-lg text-xs space-y-2">
-                            <div className="flex justify-between items-center text-[9px] text-lime-400 font-bold font-mono">
-                              <span>⚜️ FORMULAIRE WHATSAPP (CONFIÉ À STEVENBMJ)</span>
-                              <MessageSquare className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="bg-neutral-950 p-3 rounded border border-white/5 font-mono text-[10px] text-neutral-305 leading-relaxed text-left whitespace-pre-line">
-                              {`*STEVENBMJ* ⚜️
-━━━━━━━━━━━━━━━
-Cher(e) *${selectedVipForMsg.customerName}*,
-
-${vipMsgBody || "[Votre message de prestige s'écrira ici en direct]"}
-
-⚜️ _StevenBmj - L'émotion de l'Or_`}
-                            </div>
-                          </div>
-
-                          {/* Email Template Form */}
-                          <div className="p-4 bg-indigo-950/20 border border-indigo-500/20 rounded-lg text-xs space-y-2">
-                            <div className="flex justify-between items-center text-[9px] text-indigo-400 font-bold font-mono">
-                              <span>✉️ FORMULAIRE LUXURY MAIL (STEVENBMJ SOUVERAIN)</span>
-                              <Mail className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="bg-neutral-950 p-3 rounded border border-white/5 font-sans text-[10px] text-neutral-305 leading-relaxed text-left whitespace-pre-line">
-                              {`✨ STEVENBMJ HAUTE COUTURE ✨
---------------------------------------------------
-Cher/Chère ${selectedVipForMsg.customerName},
-
-${vipMsgBody || "[Votre message de prestige s'écrira ici en direct]"}
-
-Nous restons à votre entière disposition dans nos ateliers.
-L'élégance n'est pas une attitude, c'est une complication.
-
-Bien cordialement,
-StevenBmj - Conciergerie Royale`}
-                            </div>
-                          </div>
-                        </div>
-
-                        {vipMsgError && (
-                          <p className="text-[10px] font-mono text-red-400 bg-red-950/20 border border-red-500/20 rounded px-3 py-2">
-                            {vipMsgError}
-                          </p>
-                        )}
-
-                        <div className="flex justify-end pt-2">
-                          <button
-                            type="button"
-                            onClick={() => handleSendDualVipMessage(selectedVipForMsg)}
-                            disabled={!vipMsgBody.trim() || vipMsgLoading}
-                            className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-600 text-black text-xs font-mono font-bold uppercase tracking-wider rounded-lg hover:brightness-110 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed duration-300 flex items-center space-x-2"
-                          >
-                            {vipMsgLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            <span>{vipMsgLoading ? 'TRANSMISSION EN COURS...' : 'LANCER LA DOUBLE TRANSMISSION SÉCURISÉE'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {selectedVipForMsg && <VipMessageComposer key={selectedVipForMsg.email || selectedVipForMsg.whatsapp} recipient={selectedVipForMsg} close={() => setSelectedVipForMsg(null)} />}
 
                 {/* VIP LIST IN STUNNING CARDS AND DYNAMIC COLOURS */}
                 {filteredVips.length === 0 ? (
@@ -3337,126 +3038,7 @@ StevenBmj - Conciergerie Royale`}
             </form>
           )}
 
-          {/* TAB 7: ADVANCED CYBERSECURITY MONITOR */}
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              
-              <div className="border-b border-red-500/20 pb-4">
-                <div className="flex items-center space-x-2 text-red-500">
-                  <ShieldAlert className="w-5 h-5 animate-pulse" />
-                  <h3 className="text-sm font-semibold uppercase tracking-widest">
-                    PARE-FEU LOGICIEL CYBER-ESPACE ET PAQUETS LOGS
-                  </h3>
-                </div>
-                <p className="text-[10px] text-neutral-500 mt-1 uppercase font-mono">
-                  Ethical Hacking active shield block. Anti SQL Injection & anti Cross-site Scripting acts initialized.
-                </p>
-              </div>
-
-              {/* Secure status boxes grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div className="bg-black p-4 border border-white/5 rounded">
-                  <p className="text-[9px] font-mono text-neutral-500 uppercase">SYS SECURE SHIELD</p>
-                  <p className="text-xs text-emerald-400 font-bold font-mono">● EN LIGNE / OK</p>
-                </div>
-                <div className="bg-black p-4 border border-white/5 rounded">
-                  <p className="text-[9px] font-mono text-neutral-500 uppercase">INJECTIONS SQL DETECTÉES</p>
-                  <p className="text-xs text-emerald-400 font-bold font-mono">0 ATTENDED / CLEAN</p>
-                </div>
-                <div className="bg-black p-4 border border-white/5 rounded">
-                  <p className="text-[9px] font-mono text-neutral-500 uppercase">PROTECT XSS / DATA VALIDATOR</p>
-                  <p className="text-xs text-emerald-400 font-bold font-mono">ZOD SCHEMA ACTIF</p>
-                </div>
-                <div className="bg-black p-4 border border-white/5 rounded">
-                  <p className="text-[9px] font-mono text-neutral-500 uppercase">DOS LIMITER BLOCKS</p>
-                  <p className="text-xs text-red-400 font-bold font-mono">🛡 RATE LIMIT ENGINE</p>
-                </div>
-              </div>
-
-              {/* Logs visualizer outputs */}
-              <div className="space-y-3">
-                <div className="flex flex-col md:flex-row gap-3 justify-between items-start md:items-center">
-                  <span className="text-[10px] font-mono text-neutral-500 uppercase block tracking-wider text-left">CYBER PACKET AUDITS TERMINAL LOGS :</span>
-                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                    <input
-                      type="text"
-                      value={logSearchQuery}
-                      onChange={(e) => setLogSearchQuery(e.target.value)}
-                      placeholder="Rechercher par texte (ex: Connexion, Promo...)"
-                      className="bg-neutral-900 border border-white/10 text-xs px-3 py-1.5 text-white placeholder-neutral-600 font-mono w-full sm:w-60"
-                    />
-                    <input
-                      type="date"
-                      value={logSearchDate}
-                      onChange={(e) => setLogSearchDate(e.target.value)}
-                      className="bg-neutral-900 border border-white/10 text-xs px-3 py-1.5 text-neutral-400 font-mono w-full sm:w-40"
-                    />
-                    { (logSearchQuery || logSearchDate) && (
-                      <button
-                        onClick={() => {
-                          setLogSearchQuery('');
-                          setLogSearchDate('');
-                        }}
-                        className="px-2.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 text-[10px] font-mono uppercase cursor-pointer"
-                      >
-                        Effacer
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearLogs}
-                    className="p-1.5 px-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/20 text-[9px] font-mono uppercase tracking-widest duration-300 rounded cursor-pointer"
-                  >
-                    🗑 Vider les logs
-                  </button>
-                </div>
-                <div className="bg-black/90 text-[10.5px] font-mono text-neutral-400 p-4 border border-white/10 rounded-lg max-h-64 overflow-y-auto space-y-1.5 font-sans leading-relaxed text-left">
-                  {(() => {
-                    const filteredLogs = logs.filter((log: any) => {
-                      const eventText = String(log.event || '');
-                      const statusText = String(log.status || '');
-                      const timestampText = String(log.timestamp || '');
-                      const matchesText = logSearchQuery ? (
-                        eventText.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                        statusText.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
-                        timestampText.toLowerCase().includes(logSearchQuery.toLowerCase())
-                      ) : true;
-                      
-                      // Match date string like YYYY-MM-DD
-                      let matchesDate = true;
-                      if (logSearchDate) {
-                        // Date looks like YYYY-MM-DD, log timestamp looks like 24/05/2026 or ISO
-                        // Let's check both format
-                        const [year, month, day] = logSearchDate.split('-'); // e.g., "2026-05-24" -> ["2026", "05", "24"]
-                        const expectedFrenchDate = `${day}/${month}/${year}`; // "24/05/2026"
-                        const expectedAltFrenchDate = `${day}-${month}-${year}`;
-                        matchesDate = timestampText.includes(expectedFrenchDate) || timestampText.includes(expectedAltFrenchDate) || timestampText.includes(logSearchDate);
-                      }
-                      return matchesText && matchesDate;
-                    });
-
-                    if (filteredLogs.length === 0) {
-                      return <p className="text-neutral-600 italic uppercase">Aucun log ne correspond aux critères de recherche.</p>;
-                    }
-
-                    return filteredLogs.map((log: any, idx: number) => (
-                      <p key={idx} className="border-b border-neutral-900/40 pb-1 flex justify-between gap-4">
-                        <span className="text-neutral-500">[{log.timestamp}]</span>
-                        <span className="text-white font-medium flex-1 text-neutral-300">{log.event}</span>
-                        <span className={`px-2 py-0.5 rounded text-[9px] ${
-                          log.status === 'ATTACK_BLOCKED' ? 'bg-red-500/10 text-red-400' : 'bg-neutral-800 text-neutral-400'
-                        }`}>
-                          {log.status}
-                        </span>
-                      </p>
-                    ));
-                  })()}
-                </div>
-              </div>
-
-            </div>
-          )}
+          {activeTab === 'security' && <SecurityConsole />}
 
           {/* TAB 8: CUSTOMER REVIEWS MODERATION */}
           {activeTab === 'reviews' && (

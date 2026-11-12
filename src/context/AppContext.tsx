@@ -32,6 +32,7 @@ interface AppContextType {
   vipPoints: number;
   addVipPoints: (pts: number) => void;
   formatPrice: (priceInEur: number) => string;
+  exchangeInfo: { asOf: string | null; stale: boolean; usd: number | null };
   hasIntroPlayed: boolean;
   setHasIntroPlayed: (played: boolean) => void;
   products: Product[];
@@ -51,6 +52,8 @@ interface AppContextType {
   authLoading: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
+  authEntry: { mode: 'login' | 'register' } | null;
+  openAuth: (mode: 'login' | 'register') => void;
   triggerAuthRequired: (callbackOnSuccess: () => void) => void;
   executeAuthCallback: () => void;
 }
@@ -77,14 +80,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authLoading, setAuthLoading] = useState(true);
   const [preparedContact, setPreparedContact] = useState<AppContextType['preparedContact']>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authEntry, setAuthEntry] = useState<AppContextType['authEntry']>(null);
+  const openAuth = (mode: 'login' | 'register') => {
+    setAuthEntry({ mode });
+    setAuthModalOpen(true);
+  };
   const [authCallback, setAuthCallback] = useState<(() => void) | null>(null);
 
   // Rates relative to EUR
-  const rates = {
-    EUR: 1,
-    CFA: 655.957,
-    USD: 1.09,
-  };
+  const [exchangeInfo, setExchangeInfo] = useState<AppContextType['exchangeInfo']>({ asOf: null, stale: true, usd: null });
+  const rates = { EUR: 1, CFA: 655.957, USD: exchangeInfo.usd };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/shop?resource=rates', { signal: controller.signal });
+        const data = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted && data?.base === 'EUR' && typeof data.rates?.USD === 'number' && data.rates.USD > 0)
+          setExchangeInfo({ asOf: data.asOf, stale: data.stale === true, usd: data.rates.USD });
+      } catch { /* Keep the last verified quote; do not invent a USD conversion. */ }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { if (!document.hidden) void refresh(); }, 600000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, []);
 
   // Synchronize localStorage on mount
   useEffect(() => {
@@ -302,6 +322,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const formatPrice = (priceInEur: number) => {
+    if (currency === 'USD' && !rates.USD) return new Intl.NumberFormat(language === 'FR' ? 'fr-FR' : 'en-GB', { style: 'currency', currency: 'EUR' }).format(priceInEur);
     const converted = priceInEur * rates[currency];
     if (currency === 'EUR') {
       return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(converted);
@@ -404,6 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         vipPoints,
         addVipPoints,
         formatPrice,
+        exchangeInfo,
         hasIntroPlayed,
         setHasIntroPlayed: handleSetIntroPlayed,
         products,
@@ -423,6 +445,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logout,
         authModalOpen,
         setAuthModalOpen,
+        authEntry,
+        openAuth,
         triggerAuthRequired,
         executeAuthCallback
       }}

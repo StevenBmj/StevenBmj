@@ -54,6 +54,8 @@ export function fakeSupabase() {
     ],
     products: [{ id: 'product-1', name: 'Watch', description: 'A real catalogue item', category: 'watches', price: 100, stock: 5, images: ['/logo.png'], specs: [] }],
     reviews: [], promo_codes: [], security_logs: [], announcements: [],
+    driver_profiles: [], notifications: [], order_events: [], order_delivery_proofs: [],
+    payment_events: [], business_expenses: [], push_subscriptions: [], push_jobs: [], exchange_rates: [], outreach_messages: [],
   };
   const requests: { method: string; path: string; body: any }[] = [];
   let limitAllowed = true;
@@ -94,13 +96,14 @@ export function fakeSupabase() {
     const matching = (row: any) => [...url.searchParams].every(([key, value]) => {
       if (value.startsWith('eq.')) return String(row[key]) === value.slice(3);
       if (value.startsWith('in.(')) return value.slice(4, -1).split(',').includes(String(row[key]));
+      if (value === 'is.null') return row[key] == null;
       return true;
     });
     let rows = tables[table].filter(matching);
     if (method === 'POST') {
       const inputs = Array.isArray(body) ? body : [body];
       rows = inputs.map(item => {
-        const existing = tables[table].find(row => row.id === item.id);
+        const existing = item.id === undefined ? undefined : tables[table].find(row => row.id === item.id);
         if (existing) return Object.assign(existing, item);
         tables[table].push(item);
         return item;
@@ -110,6 +113,7 @@ export function fakeSupabase() {
     } else if (method === 'DELETE') {
       tables[table] = tables[table].filter(row => !matching(row));
     }
+    if (method === 'HEAD') return new Response(null, { status: 200, headers: { 'content-range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` } });
     return json(headers.get('accept')?.includes('vnd.pgrst.object') ? (rows[0] || null) : rows);
   };
   return { tables, requests, denyRateLimit() { limitAllowed = false; }, restore() { globalThis.fetch = originalFetch; } };

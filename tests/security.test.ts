@@ -1,15 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import settings from '../api/settings';
-import products from '../api/products';
-import users from '../api/auth/users';
-import userById from '../api/auth/users/[id]';
-import shop from '../api/shop';
-import login from '../api/auth/login';
-import register from '../api/auth/register';
-import activate from '../api/auth/activate';
-import resetPassword from '../api/auth/request-reset-code';
-import session from '../api/auth/session';
+import settings from '../serverless/settings';
+import products from '../serverless/products';
+import users from '../serverless/auth/users';
+import userById from '../serverless/auth/users/[id]';
+import shop from '../serverless/shop';
+import login from '../serverless/auth/login';
+import register from '../serverless/auth/register';
+import activate from '../serverless/auth/activate';
+import resetPassword from '../serverless/auth/request-reset-code';
+import session from '../serverless/auth/session';
 import { hashCode } from '../src/server/security';
 import { ADMIN_ID, CLIENT_ID, OTHER_ID, fakeSupabase, invoke, sessionHeaders } from './helpers/api';
 

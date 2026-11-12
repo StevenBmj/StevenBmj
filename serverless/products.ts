@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireUser, readJson, reply } from '../src/server/security';
+import { requireUser, readJson, reply, recordSecurityEvent } from '../src/server/security';
 
 const json = reply;
 
@@ -73,19 +73,12 @@ function productToRow(product: any) {
 }
 
 async function addSecurityLog(supabase: any, req: any, event: string, status = 'SECURED') {
-  const ip = String(req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').split(',')[0].trim();
-  await supabase.from('security_logs').insert({
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    timestamp: new Date().toISOString(),
-    ip,
-    event,
-    status,
-  }).then(() => null, () => null);
+  await recordSecurityEvent(req, event, status);
 }
 
 export default async function handler(req: any, res: any) {
   try {
-    if (req.method !== 'GET' && !(await requireUser(req, res, true))) return;
+    if (req.method !== 'GET') { req.actor = await requireUser(req, res, true); if (!req.actor) return; }
     const supabase = supabaseAdmin();
     const id = cleanText(req.query?.id, 80);
 

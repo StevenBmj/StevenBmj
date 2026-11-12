@@ -15,11 +15,12 @@ export default async function handler(req: any, res: any) {
     if (!current.data || current.data.is_confirmed) return reply(res, 400, { error: 'Activation impossible. Connectez-vous ou demandez un nouveau code.' });
     if (resend) {
       const code = newCode();
-      const updated = await client.from('profiles').update({ activation_code: hashCode(email, 'activation', code), activation_expires_at: new Date(Date.now() + 300000).toISOString() }).eq('id', current.data.id);
+      const expiresAt = new Date(Date.now() + 300000).toISOString();
+      const updated = await client.from('profiles').update({ activation_code: hashCode(email, 'activation', code), activation_expires_at: expiresAt }).eq('id', current.data.id);
       if (updated.error) throw new Error('Unable to save code');
       const sent = await sendEmail(email, 'Activation de votre compte StevenBmj', `<p>Votre code de validation :</p><h2>${code}</h2><p>Valable cinq minutes. Ne partagez pas ce code.</p>`);
       if (!sent) return reply(res, 503, { error: 'Envoi du code indisponible. Reessayez plus tard.' });
-      return reply(res, 200, { success: true, email, expiresAt: Date.now() + 300000, message: 'Un nouveau code est envoye a votre adresse mail. Il est valable cinq minutes.' });
+      return reply(res, 200, { success: true, email, expiresAt, expiresInSeconds: Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000)), message: 'Un nouveau code est envoye a votre adresse mail. Il est valable cinq minutes.' });
     }
     const code = String(body.code || '').trim().toUpperCase();
     const expiry = Date.parse(current.data.activation_expires_at || '');

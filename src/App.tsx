@@ -6,6 +6,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import { ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Header from './components/Header';
@@ -24,6 +25,8 @@ import { Product } from './types';
 
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
 const GodDashboard = lazy(() => import('./components/GodDashboard'));
+const OrderWorkspace = lazy(() => import('./components/OrderWorkspace'));
+const DriverWorkspace = lazy(() => import('./views/DriverWorkspace'));
 
 function AppInner() {
   const { language, triggerAuthRequired, products, productsLoading, user, authLoading } = useApp();
@@ -120,6 +123,9 @@ function AppInner() {
               <CustomerCare />
             )}
 
+            {currentView === 'account' && <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"><Suspense fallback={<p role="status">{language === 'FR' ? 'Chargement…' : 'Loading…'}</p>}><OrderWorkspace key={user?.id || 'guest'} role="client" /></Suspense></div>}
+            {currentView === 'driver' && <Suspense fallback={<p role="status">{language === 'FR' ? 'Chargement…' : 'Loading…'}</p>}><DriverWorkspace key={user?.id || 'guest'} /></Suspense>}
+
             {currentView === 'god' && (
               <Suspense fallback={<p role="status" className="p-6">{language === 'FR' ? 'Chargement...' : 'Loading...'}</p>}><GodDashboard /></Suspense>
             )}
@@ -163,7 +169,7 @@ export default function App() {
   return (
     <NavigationProvider>
       <AppProvider>
-        <AppInner />
+        <NotificationsProvider><AppInner /></NotificationsProvider>
       </AppProvider>
     </NavigationProvider>
   );

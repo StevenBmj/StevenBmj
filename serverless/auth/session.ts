@@ -27,6 +27,7 @@ export default async function handler(req: any, res: any) {
           if (session) {
             const deleted = await client.from('web_sessions').delete().eq('id', session.id).eq('user_id', identity.id);
             if (deleted.error) throw new Error('Unable to revoke session');
+            await client.from('push_subscriptions').delete().eq('session_id', session.id).eq('user_id', identity.id);
           }
           await client.auth.admin.signOut(token, 'local');
         }

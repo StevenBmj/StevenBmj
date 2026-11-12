@@ -14,7 +14,9 @@ export default async function handler(req: any, res: any) {
     const profile = await client.from('profiles').select('*').eq('id', auth.data.user.id).maybeSingle();
     if (profile.error) throw new Error('Unable to read profile');
     if (!profile.data) return reply(res, 401, { error: 'Identifiants incorrects.' });
-    if (!profile.data.is_confirmed) return reply(res, 403, { error: 'UNCONFIRMED_ACCOUNT', email, message: 'Activez votre compte avec le code recu par e-mail.' });
+    if (!profile.data.is_confirmed) return reply(res, 403, { error: 'UNCONFIRMED_ACCOUNT', email,
+      expiresInSeconds: Math.max(0, Math.min(300, Math.ceil((Date.parse(profile.data.activation_expires_at || '') - Date.now()) / 1000) || 0)),
+      message: 'Activez votre compte avec le code recu par e-mail.' });
     await setSession(req, res, auth.data.session);
     return reply(res, 200, { success: true, user: userView(profile.data) });
   } catch {

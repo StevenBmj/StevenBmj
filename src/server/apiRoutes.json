@@ -1,0 +1,86 @@
+[
+  {
+    "source": "/api/assistant/keys",
+    "destination": "/api/assistant?resource=keys"
+  },
+  {
+    "source": "/api/assistant/speech",
+    "destination": "/api/assistant?resource=speech"
+  },
+  {
+    "source": "/api/invoices/verify",
+    "destination": "/api/shop?resource=invoice-verify"
+  },
+  {
+    "source": "/api/products/:id",
+    "destination": "/api/products?id=:id"
+  },
+  {
+    "source": "/api/analytics",
+    "destination": "/api/shop?resource=analytics"
+  },
+  {
+    "source": "/api/announcements/:id",
+    "destination": "/api/shop?resource=announcements&id=:id"
+  },
+  {
+    "source": "/api/announcements",
+    "destination": "/api/shop?resource=announcements"
+  },
+  {
+    "source": "/api/security-logs",
+    "destination": "/api/shop?resource=security-logs"
+  },
+  {
+    "source": "/api/vip-message",
+    "destination": "/api/shop?resource=vip-message"
+  },
+  {
+    "source": "/api/promos/:code/toggle",
+    "destination": "/api/shop?resource=promos&code=:code&action=toggle"
+  },
+  {
+    "source": "/api/promos/:code",
+    "destination": "/api/shop?resource=promos&code=:code"
+  },
+  {
+    "source": "/api/promos",
+    "destination": "/api/shop?resource=promos"
+  },
+  {
+    "source": "/api/orders/:id",
+    "destination": "/api/shop?resource=orders&id=:id"
+  },
+  {
+    "source": "/api/orders",
+    "destination": "/api/shop?resource=orders"
+  },
+  {
+    "source": "/api/reviews/admin",
+    "destination": "/api/shop?resource=reviews&scope=admin"
+  },
+  {
+    "source": "/api/reviews/:id/approve",
+    "destination": "/api/shop?resource=reviews&id=:id&action=approve"
+  },
+  {
+    "source": "/api/reviews/:id",
+    "destination": "/api/shop?resource=reviews&id=:id"
+  },
+  {
+    "source": "/api/reviews",
+    "destination": "/api/shop?resource=reviews"
+  },
+  {
+    "source": "/api/contact",
+    "destination": "/api/shop?resource=message&kind=contact"
+  },
+  {
+    "source": "/api/care",
+    "destination": "/api/shop?resource=message&kind=care"
+  },
+  {
+    "source": "/api/newsletter",
+    "destination": "/api/shop?resource=newsletter"
+  }
+]

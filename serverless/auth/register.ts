@@ -102,6 +102,8 @@ export default async function handler(req: any, res: any) {
       requiresActivation: !isAdmin,
       email,
       emailSent,
+      expiresAt: activationExpiresAt,
+      expiresInSeconds: Math.max(0, Math.ceil((Date.parse(activationExpiresAt || '') - Date.now()) / 1000) || 0),
       message: !isAdmin ? "Un code est envoyé à votre adresse mail. Entrez-le dans les 5 minutes pour finaliser votre compte." : undefined,
       user: isAdmin ? publicUser(profile) : null,
     });

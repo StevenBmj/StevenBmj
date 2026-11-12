@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import assistant from '../api/assistant';
+import assistant from '../serverless/assistant';
 import { encryptKey, decryptKey, speechToken, readSpeechToken } from '../src/server/assistant';
 import { ADMIN_ID, CLIENT_ID, fakeSupabase, invoke, sessionHeaders } from './helpers/api';
 

@@ -57,11 +57,11 @@ export async function sendEmail(to: string, subject: string, html: string) {
       pass: process.env.MAIL_APP_PASSWORD,
     },
   });
-  await transporter.sendMail({
+  const result = await transporter.sendMail({
     from: `"Maison StevenBmj" <${process.env.MAIL_USER}>`,
     to,
     subject,
     html,
   });
-  return true;
+  return result.accepted.some(recipient => recipient.toLowerCase() === to.trim().toLowerCase());
 }

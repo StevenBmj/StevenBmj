@@ -25,6 +25,7 @@ export default function AuthModal() {
   const { 
     language, 
     authModalOpen, 
+    authEntry,
     setAuthModalOpen, 
     setUser, 
     executeAuthCallback,
@@ -58,10 +59,20 @@ export default function AuthModal() {
   const [isAddingGoogle, setIsAddingGoogle] = useState(false);
   const [googleAddError, setGoogleAddError] = useState('');
 
-  const startActivationTimer = () => {
-    const deadline = Date.now() + ACTIVATION_WINDOW_SECONDS * 1000;
+  useEffect(() => {
+    if (!authEntry) return;
+    setMode(authEntry.mode);
+    setError('');
+    setPassword('');
+    setShowPassword(false);
+    setShowGoogleSim(false);
+  }, [authEntry]);
+
+  const startActivationTimer = (remaining: unknown) => {
+    const seconds = typeof remaining === 'number' && Number.isFinite(remaining) ? Math.max(0, Math.min(ACTIVATION_WINDOW_SECONDS, remaining)) : 0;
+    const deadline = Date.now() + seconds * 1000;
     setActivationDeadline(deadline);
-    setActivationRemaining(ACTIVATION_WINDOW_SECONDS);
+    setActivationRemaining(seconds);
   };
 
   const formatActivationTime = (seconds: number) => {
@@ -221,7 +232,7 @@ export default function AuthModal() {
           setActivationEmail(data.email || email);
           setActivationCode('');
           setResendFeedback('');
-          startActivationTimer();
+          startActivationTimer(data.expiresInSeconds);
           setMode('activate');
           setError(language === 'FR' 
             ? "Votre compte d'exception est en attente d'activation. Veuillez entrer le code d'activation reçu par e-mail." 
@@ -236,7 +247,7 @@ export default function AuthModal() {
         setActivationEmail(data.email);
         setActivationCode('');
         setResendFeedback('');
-        startActivationTimer();
+        startActivationTimer(data.expiresInSeconds);
         setMode('activate');
         setError('');
         return;
@@ -327,7 +338,7 @@ export default function AuthModal() {
       if (!res.ok) throw new Error(data.error || "Erreur d'envoi du code.");
       setActivationCode('');
       setActivationEmail(data.email || targetEmail);
-      startActivationTimer();
+      startActivationTimer(data.expiresInSeconds);
       setResendFeedback(data.message || (language === 'FR' ? "Un nouveau code est envoye a votre adresse mail." : "A new code has been sent to your email."));
     } catch (err: any) {
       setError(err.message);

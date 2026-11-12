@@ -1,17 +1,18 @@
-import products from '../../api/products';
-import settings from '../../api/settings';
-import shop from '../../api/shop';
-import login from '../../api/auth/login';
-import register from '../../api/auth/register';
-import activate from '../../api/auth/activate';
-import google from '../../api/auth/google';
-import session from '../../api/auth/session';
-import users from '../../api/auth/users';
-import userById from '../../api/auth/users/[id]';
-import reset from '../../api/auth/request-reset-code';
-import chat from '../../api/gemini/chat';
-import assistant from '../../api/assistant';
+import products from '../../serverless/products';
+import settings from '../../serverless/settings';
+import shop from '../../serverless/shop';
+import login from '../../serverless/auth/login';
+import register from '../../serverless/auth/register';
+import activate from '../../serverless/auth/activate';
+import google from '../../serverless/auth/google';
+import session from '../../serverless/auth/session';
+import users from '../../serverless/auth/users';
+import userById from '../../serverless/auth/users/[id]';
+import reset from '../../serverless/auth/request-reset-code';
+import chat from '../../serverless/gemini/chat';
+import assistant from '../../serverless/assistant';
 import { reply } from './security';
+import rewrites from './apiRoutes.json';
 
 const handlers: Record<string, any> = {
   '/api/products': products, '/api/settings': settings, '/api/shop': shop,
@@ -27,10 +28,9 @@ export async function dispatchApi(req: any, res: any) {
   try {
     const url = new URL(req.originalUrl || req.url, 'http://local.invalid');
     // Resolve the same rewrites as Vercel, with path parameters taking precedence.
-    const config = await import('../../vercel.json');
     let route = url.pathname;
     const query = Object.fromEntries(url.searchParams);
-    for (const rule of config.default.rewrites) {
+    for (const rule of rewrites) {
       if (!rule.source.startsWith('/api/')) continue;
       const names = [...rule.source.matchAll(/:(\w+)/g)].map(m => m[1]);
       const pattern = rule.source.replace(/:(\w+)/g, '([^/]+)');

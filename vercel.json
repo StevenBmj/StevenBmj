@@ -5,108 +5,72 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
-        { "key": "X-DNS-Prefetch-Control", "value": "off" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://oauth2.googleapis.com https://accounts.google.com ; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://accounts.google.com https://www.google.com https://maps.google.com; form-action 'self' https://wa.me https://api.whatsapp.com; upgrade-insecure-requests" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "X-DNS-Prefetch-Control",
+          "value": "off"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co https://oauth2.googleapis.com https://accounts.google.com ; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://accounts.google.com https://www.google.com https://maps.google.com; form-action 'self' https://wa.me https://api.whatsapp.com; upgrade-insecure-requests"
+        }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/logo.png",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/api/assistant/keys", "destination": "/api/assistant?resource=keys" },
-    { "source": "/api/assistant/speech", "destination": "/api/assistant?resource=speech" },
-    { "source": "/api/invoices/verify", "destination": "/api/shop?resource=invoice-verify" },
     {
-      "source": "/api/products/:id",
-      "destination": "/api/products?id=:id"
-    },
-    {
-      "source": "/api/analytics",
-      "destination": "/api/shop?resource=analytics"
-    },
-    {
-      "source": "/api/announcements/:id",
-      "destination": "/api/shop?resource=announcements&id=:id"
-    },
-    {
-      "source": "/api/announcements",
-      "destination": "/api/shop?resource=announcements"
-    },
-    {
-      "source": "/api/security-logs",
-      "destination": "/api/shop?resource=security-logs"
-    },
-    {
-      "source": "/api/vip-message",
-      "destination": "/api/shop?resource=vip-message"
-    },
-    {
-      "source": "/api/promos/:code/toggle",
-      "destination": "/api/shop?resource=promos&code=:code&action=toggle"
-    },
-    {
-      "source": "/api/promos/:code",
-      "destination": "/api/shop?resource=promos&code=:code"
-    },
-    {
-      "source": "/api/promos",
-      "destination": "/api/shop?resource=promos"
-    },
-    {
-      "source": "/api/orders/:id",
-      "destination": "/api/shop?resource=orders&id=:id"
-    },
-    {
-      "source": "/api/orders",
-      "destination": "/api/shop?resource=orders"
-    },
-    {
-      "source": "/api/reviews/admin",
-      "destination": "/api/shop?resource=reviews&scope=admin"
-    },
-    {
-      "source": "/api/reviews/:id/approve",
-      "destination": "/api/shop?resource=reviews&id=:id&action=approve"
-    },
-    {
-      "source": "/api/reviews/:id",
-      "destination": "/api/shop?resource=reviews&id=:id"
-    },
-    {
-      "source": "/api/reviews",
-      "destination": "/api/shop?resource=reviews"
-    },
-    {
-      "source": "/api/contact",
-      "destination": "/api/shop?resource=message&kind=contact"
-    },
-    {
-      "source": "/api/care",
-      "destination": "/api/shop?resource=message&kind=care"
-    },
-    {
-      "source": "/api/newsletter",
-      "destination": "/api/shop?resource=newsletter"
+      "source": "/api/:path*",
+      "destination": "/api?__path=:path*"
     },
     {
       "source": "/((?!api/.*).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60
+    }
+  }
 }

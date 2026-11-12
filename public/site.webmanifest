@@ -1,7 +1,9 @@
 {
   "name": "StevenBmj",
   "short_name": "StevenBmj",
-  "description": "Haute horlogerie, joaillerie, couture et accessoires de prestige StevenBmj.",
+  "description": "Vêtements, chaussures, montres et accessoires StevenBmj.",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

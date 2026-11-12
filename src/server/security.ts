@@ -1,4 +1,5 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import { createClient } from '@supabase/supabase-js';
 
 export function adminClient() {
@@ -129,6 +130,7 @@ export async function requireUser(req: any, res: any, adminOnly = false) {
     return null;
   }
   if (adminOnly && profile.data.is_admin !== true) {
+    await recordSecurityEvent(req, 'Administrator access refused', 'BLOCKED', profile.data.id);
     reply(res, 403, { error: 'Acces reserve a un administrateur.' });
     return null;
   }
@@ -182,11 +184,38 @@ export async function authRateLimit(req: any, res: any, scope: string, limit = 1
     return false;
   }
   if (result.data?.allowed !== true) {
+    await recordSecurityEvent(req, `Request quota exceeded: ${scope}`, 'BLOCKED');
     res.setHeader('Retry-After', String(result.data?.retry_after || windowSeconds));
     reply(res, 429, { error: 'Trop de tentatives. Patientez avant de reessayer.' });
     return false;
   }
   return true;
+}
+
+export function requestLocation(req: any) {
+  const hosted = process.env.VERCEL === '1';
+  const candidate = String(hosted ? req.headers?.['x-vercel-forwarded-for'] || req.headers?.['x-real-ip'] || '' : req.socket?.remoteAddress || '').split(',')[0].trim();
+  const country = hosted && /^[A-Z]{2}$/.test(req.headers?.['x-vercel-ip-country'] || '') ? req.headers['x-vercel-ip-country'] : null;
+  let city: string | null = null;
+  if (hosted && typeof req.headers?.['x-vercel-ip-city'] === 'string') {
+    try { city = decodeURIComponent(req.headers['x-vercel-ip-city']).replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 120) || null; } catch { /* Ignore invalid provider metadata. */ }
+  }
+  return { ip: isIP(candidate) ? candidate : 'unknown', country, city };
+}
+
+export async function recordSecurityEvent(req: any, event: string, status = 'SECURED', actorId?: string) {
+  try {
+    const client = adminClient();
+    const location = requestLocation(req);
+    if (status === 'BLOCKED') {
+      const key = hashCode(`audit:${location.ip}:${event}`, 'reset', 'rate-limit');
+      const allowance = await client.rpc('consume_security_limit', { p_key: key, p_limit: 1, p_window_seconds: 60 });
+      if (allowance.error || allowance.data?.allowed !== true) return;
+    }
+    const result = await client.from('security_logs').insert({ id: `audit-${randomUUID()}`, timestamp: new Date().toISOString(), ...location,
+      actor_id: actorId || req.actor?.profile?.id || null, event: event.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 300), status });
+    if (result.error) console.warn('Security event could not be persisted');
+  } catch { console.warn('Security event storage unavailable'); }
 }
 
 const settingNames = new Set([

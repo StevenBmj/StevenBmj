@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiFetch as fetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import { HelpCircle, ChevronRight, ChevronDown, Mail, Phone, Clock, FileText, Send } from 'lucide-react';
@@ -17,6 +17,10 @@ export default function CustomerCare() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (window.location.hash === '#faq') document.getElementById('faq')?.scrollIntoView();
+  }, []);
 
   const faqs = (() => {
     if (settings && settings.faqsJson) {
@@ -120,7 +124,7 @@ export default function CustomerCare() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
         
         {/* Left Hand: Collapsible luxury FAQs */}
-        <div className="space-y-6">
+        <div id="faq" className="space-y-6 scroll-mt-36">
           <h3 className="text-lg font-light tracking-[0.25em] text-white uppercase flex items-center gap-2">
             <HelpCircle className="w-5 h-5 text-amber-500 stroke-1" />
             <span>{language === 'FR' ? 'Questions Fréquentes' : 'Frequently Asked Questions'}</span>

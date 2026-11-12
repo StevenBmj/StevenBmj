@@ -63,5 +63,5 @@ test('admin key settings keep client and administrator credentials distinct', as
   await expect(page.getByText('Admin One', { exact: false })).toBeVisible();
   await expect(page.getByText('Client One', { exact: false })).toHaveCount(0);
   await page.getByRole('button', { name: 'Tester la clé' }).click();
-  expect(actions).toEqual([{ id: 'admin-key', action: 'test', scope: 'admin' }]);
+  await expect.poll(() => actions).toEqual([{ id: 'admin-key', action: 'test', scope: 'admin' }]);
 });

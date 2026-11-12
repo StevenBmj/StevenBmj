@@ -3,381 +3,171 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { apiFetch as fetch } from '../lib/api';
+import { useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { ArrowRight, Check, Facebook, Instagram, LoaderCircle, Mail, Phone } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 import { useApp } from '../context/AppContext';
 import Logo from './Logo';
-import { Mail, ArrowRight, Instagram, Phone, Globe, ShieldCheck, Heart } from 'lucide-react';
+import FooterPolicyDialog from './FooterPolicyDialog';
+import { footerPolicies, policyOrder, type PolicyId } from './footerPolicies';
 
-interface FooterProps {
-  setView: (view: string) => void;
+const linkClass = 'inline-flex min-h-11 items-center text-left text-sm leading-6 text-neutral-300 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400 rounded transition-colors';
+const headingClass = 'mb-4 text-sm font-semibold text-white';
+
+function safeSocialUrl(value: string | undefined, fallback: string) {
+  try {
+    const url = new URL(value || fallback);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : fallback;
+  } catch { return fallback; }
 }
 
-export default function Footer({ setView }: FooterProps) {
-  const { language, formatPrice, settings } = useApp();
+export default function Footer({ setView }: { setView: (view: string) => void }) {
+  const { language, settings, user, authLoading, openAuth, setCartOpen } = useApp();
+  const fr = language === 'FR';
+  const policies = footerPolicies[language];
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [subscribeError, setSubscribeError] = useState('');
   const [subscribeLoading, setSubscribeLoading] = useState(false);
-  const [activePolicy, setActivePolicy] = useState<'cgv' | 'privacy' | 'legal' | null>(null);
-  const instagramUrl = settings?.instagramUrl || 'https://instagram.com';
-  const facebookUrl = settings?.facebookUrl || 'https://www.facebook.com/share/1F3vVmSiGw/';
-  const whatsappUrl = settings?.whatsappUrl || `https://wa.me/${String(settings?.whatsappContact || '22955468138').replace(/\D/g, '')}`;
+  const sending = useRef(false);
+  const [activePolicy, setActivePolicy] = useState<PolicyId | null>(null);
 
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const socials = [
+    { name: 'Instagram', icon: Instagram, href: safeSocialUrl(settings?.instagramUrl, 'https://instagram.com') },
+    { name: 'Facebook', icon: Facebook, href: safeSocialUrl(settings?.facebookUrl, 'https://www.facebook.com/share/1F3vVmSiGw/') },
+    { name: 'WhatsApp', icon: Phone, href: safeSocialUrl(settings?.whatsappUrl, `https://wa.me/${String(settings?.whatsappContact || '2290155468138').replace(/\D/g, '')}`) },
+  ];
+
+  const go = (event: MouseEvent<HTMLAnchorElement>, view: string) => {
+    if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    setView(view);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const handleSubscribe = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (sending.current || !email.trim()) return;
+    sending.current = true;
+    setSubscribeLoading(true);
     setSubscribeError('');
-    if (email) {
-      setSubscribeLoading(true);
-      try {
-        const res = await fetch('/api/newsletter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || "Erreur d'inscription.");
-        setSubscribed(true);
-        setEmail('');
-      } catch (err: any) {
-        setSubscribeError(err.message || (language === 'FR' ? "Inscription impossible." : 'Subscription failed.'));
-      } finally {
-        setSubscribeLoading(false);
-      }
+    try {
+      const response = await apiFetch('/api/newsletter', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.success !== true) throw new Error('subscription-failed');
+      setSubscribed(true);
+      setEmail('');
+    } catch {
+      setSubscribeError(fr ? "Votre demande n'a pas pu être envoyée. Réessayez ou contactez-nous." : 'Your request could not be sent. Please retry or contact us.');
+    } finally {
+      sending.current = false;
+      setSubscribeLoading(false);
     }
   };
 
-  return (
-    <footer className="bg-black text-neutral-400 border-t border-white/5 py-16 px-4 md:px-8 mt-24">
-      <div className="mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-12">
-        
-        {/* Brand identity area */}
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center space-x-3">
-            <Logo size={50} />
-            <div className="flex flex-col text-left">
-              <span className="text-xl font-light tracking-[0.25em] text-white uppercase font-sans">StevenBmj</span>
-              <span className="text-[7px] font-mono tracking-[0.4em] text-amber-500 -mt-0.5 uppercase">Haute Joaillerie & Couture</span>
-            </div>
-          </div>
-          <p className="text-xs leading-relaxed text-neutral-500">
-            {settings?.footerText ? (
-              language === 'FR' ? settings.footerText : settings.footerTextEn
-            ) : (
-              language === 'FR' 
-                ? "Inspiré par le futurisme spatial et la perfection artisanale suisse. StevenBmj redéfinit la silhouette masculine contemporaine à travers des matériaux d'une pureté absolue."
-                : "Inspired by deep-space exploration and Swiss horological precision. StevenBmj rebuilds contemporary menswear silhouettes with materials of ultimate pureness."
-            )}
+  const description = (fr ? settings?.footerText : settings?.footerTextEn)?.trim()
+    || (fr ? 'Vêtements, chaussures, montres et accessoires pour hommes, femmes et enfants. Découvrez la sélection StevenBmj, depuis Cotonou.'
+      : 'Clothing, footwear, watches and accessories for men, women and children. Discover the StevenBmj selection, from Cotonou.');
+  const copyright = (fr ? settings?.footerCredits : settings?.footerCreditsEn)?.trim()
+    || `© ${new Date().getFullYear()} StevenBmj. ${fr ? 'Tous droits réservés.' : 'All rights reserved.'}`;
+
+  return <footer lang={language.toLowerCase()} className="mt-20 border-t border-white/10 bg-neutral-950 px-5 pb-7 pt-12 text-neutral-300 sm:px-8 lg:pt-16">
+    <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-8 gap-y-10 sm:gap-x-10 xl:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
+      <div className="col-span-2 min-w-0 sm:col-span-1">
+        <a href="/" onClick={event => go(event, 'home')} aria-label={fr ? 'StevenBmj, accueil' : 'StevenBmj, home'}
+          className="inline-flex min-h-12 items-center gap-3 rounded focus-visible:outline-2 focus-visible:outline-amber-400">
+          <Logo size={48} className="shrink-0" />
+          <span className="text-xl font-medium text-white">StevenBmj</span>
+        </a>
+        <p className="mt-4 max-w-sm break-words text-sm leading-6 text-neutral-400">{description}</p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {socials.map(({ name, icon: Icon, href }) => <a key={name} href={href} target="_blank" rel="noopener noreferrer"
+            aria-label={`${name} StevenBmj`} title={`${name} StevenBmj`}
+            className="flex size-11 items-center justify-center rounded border border-white/15 text-neutral-300 hover:border-amber-400 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
+            <Icon size={18} aria-hidden="true" />
+          </a>)}
+        </div>
+        <h2 className="mb-0 mt-6 text-sm font-semibold text-white">Contact</h2>
+        <a href="/contact" onClick={event => go(event, 'contact')} className={linkClass}>
+          {fr ? 'Formulaire de contact' : 'Contact form'}
+        </a>
+
+        <section aria-labelledby="footer-newsletter-title" className="mt-5">
+          <h2 id="footer-newsletter-title" className="flex items-center gap-2 text-sm font-semibold text-white"><Mail size={16} className="text-amber-400" aria-hidden="true" />Newsletter</h2>
+          <p className="mb-4 mt-2 text-sm leading-6 text-neutral-400">{fr ? 'Les nouveautés et offres de StevenBmj, par e-mail.' : 'StevenBmj news and offers, by email.'}</p>
+          {subscribed ? <p role="status" className="flex items-start gap-2 text-sm leading-6 text-emerald-400">
+            <Check size={18} className="mt-1 shrink-0" aria-hidden="true" />
+            {fr ? "Votre demande d'inscription a été transmise à StevenBmj." : 'Your subscription request has been sent to StevenBmj.'}
+          </p> : <form onSubmit={handleSubscribe} aria-busy={subscribeLoading} className="space-y-3">
+            <label htmlFor="footer-newsletter-email" className="sr-only">{fr ? 'Votre adresse e-mail' : 'Your email address'}</label>
+            <input id="footer-newsletter-email" name="email" type="email" autoComplete="email" required maxLength={254}
+              value={email} onChange={event => setEmail(event.target.value)} disabled={subscribeLoading}
+              placeholder={fr ? 'Votre adresse e-mail' : 'Your email address'}
+              aria-invalid={!!subscribeError} aria-describedby={subscribeError ? 'footer-newsletter-error footer-newsletter-notice' : 'footer-newsletter-notice'}
+              className="h-12 w-full rounded border border-white/20 bg-black px-3 text-base text-white placeholder:text-neutral-500 focus:border-amber-400 focus:outline-none disabled:opacity-60" />
+            <button id="btn-footer-subscribe" type="submit" disabled={subscribeLoading}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded bg-amber-400 px-4 py-3 text-sm font-semibold text-black hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400 disabled:cursor-wait disabled:opacity-60">
+              {subscribeLoading ? <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />}
+              {subscribeLoading ? (fr ? 'Envoi…' : 'Sending…') : (fr ? "S'abonner" : 'Subscribe')}
+            </button>
+          </form>}
+          {subscribeError && <p role="alert" id="footer-newsletter-error" className="mt-3 text-sm leading-6 text-red-400">{subscribeError}</p>}
+          <p id="footer-newsletter-notice" className="mt-3 text-xs leading-5 text-neutral-400">
+            {fr ? 'En vous inscrivant, vous demandez à recevoir nos actualités. Désinscription sur demande par e-mail. ' : 'By subscribing, you request shop updates. You can request removal by email. '}
+            <button type="button" onClick={() => setActivePolicy('privacy')} className="underline decoration-neutral-600 underline-offset-4 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">
+              {fr ? 'Confidentialité' : 'Privacy'}
+            </button>
           </p>
-          <div className="flex space-x-4 pt-2">
-            <a 
-              href={instagramUrl}
-              target="_blank" 
-              rel="noreferrer" 
-              className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
-              title="Instagram"
-            >
-              <Instagram className="w-4 h-4" />
-            </a>
-            <a
-              href={facebookUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
-              title="Facebook"
-              aria-label="Facebook StevenBmj"
-            >
-              <span className="block w-4 h-4 text-center font-sans font-black leading-4 text-[15px]">f</span>
-            </a>
-            <a 
-              href={whatsappUrl}
-              target="_blank" 
-              rel="noreferrer" 
-              className="p-2 border border-white/10 hover:border-amber-400 text-neutral-400 hover:text-amber-400 rounded-full transition-all duration-300"
-              title="WhatsApp Concierge"
-            >
-              <Phone className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
-
-        {/* Collections links */}
-        <div className="flex flex-col space-y-4">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-white">
-            {language === 'FR' ? 'Collections' : 'Collections'}
-          </h4>
-          <ul className="space-y-2 text-xs">
-            <li>
-              <button 
-                onClick={() => setView('boutique')} 
-                className="hover:text-amber-400 transition-colors cursor-pointer"
-              >
-                {language === 'FR' ? 'Horlogerie de Prestige' : 'Prestige Horology'}
-              </button>
-            </li>
-            <li>
-              <button 
-                onClick={() => setView('boutique')} 
-                className="hover:text-amber-400 transition-colors cursor-pointer"
-              >
-                {language === 'FR' ? 'Orfèvrerie & Chaînes 18K' : 'Fine Chains & Jewelry'}
-              </button>
-            </li>
-            <li>
-              <button 
-                onClick={() => setView('boutique')} 
-                className="hover:text-amber-400 transition-colors cursor-pointer"
-              >
-                {language === 'FR' ? 'Costumes Croisés' : 'Tailored Suits'}
-              </button>
-            </li>
-            <li>
-              <button 
-                onClick={() => setView('boutique')} 
-                className="hover:text-amber-400 transition-colors cursor-pointer"
-              >
-                {language === 'FR' ? 'Souliers & Mocassins Crêpe' : 'Crepe Loafers & Shoes'}
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        {/* Brand policies */}
-        <div className="flex flex-col space-y-4">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-white">
-            {language === 'FR' ? 'Maison' : 'Maison'}
-          </h4>
-          <ul className="space-y-2 text-xs">
-            <li>
-              <button 
-                onClick={() => setView('about')} 
-                className="hover:text-amber-400 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer text-left"
-              >
-                {language === 'FR' ? 'À Propos de la Maison' : 'About Maison StevenBmj'}
-              </button>
-            </li>
-            <li>
-              <button 
-                onClick={() => setView('contact')} 
-                className="hover:text-amber-400 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer text-left"
-              >
-                {language === 'FR' ? 'Salon Privé & Contact' : 'Private Salon & Contact'}
-              </button>
-            </li>
-            <li>
-              <span className="text-neutral-500 block">
-                {language === 'FR' ? 'Service Conciergerie 24/7' : 'Concierge Desk 24/7'}
-              </span>
-            </li>
-            <li>
-              <span className="text-amber-500/80 font-mono flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                {language === 'FR' ? 'Authenticité Garantie' : 'Guaranteed Authentic'}
-              </span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Private newsletters */}
-        <div className="flex flex-col space-y-4">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-white">
-            {language === 'FR' ? 'Salons Privés' : 'Private Access'}
-          </h4>
-          <p className="text-xs text-neutral-500 leading-relaxed">
-            {language === 'FR' 
-              ? 'Inscrivez-vous pour obtenir les invitations privilégiées de précommande et les événements confidentiels de la maison.'
-              : 'Sign up for privileged pre-order invitations and confidential brand releases.'}
-          </p>
-          
-          {subscribed ? (
-            <div className="text-xs text-amber-400 py-2 font-mono uppercase tracking-widest border border-amber-500/20 bg-amber-500/5 px-3 rounded">
-              ✓ {language === 'FR' ? 'Inscrit avec succès' : 'Successfully subscribed'}
-            </div>
-          ) : (
-            <form onSubmit={handleSubscribe} className="flex relative items-center">
-              <input 
-                id="footer-newsletter-email"
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={language === 'FR' ? 'Votre adresse email' : 'Your email address'} 
-                className="w-full bg-neutral-900 border border-neutral-800 text-xs px-4 py-3 text-white placeholder-neutral-600 rounded focus:outline-none focus:border-amber-400 duration-300"
-              />
-              <button 
-                id="btn-footer-subscribe"
-                type="submit" 
-                disabled={subscribeLoading}
-                className="absolute right-2 px-2.5 py-1 text-neutral-400 hover:text-amber-400 duration-300 cursor-pointer"
-              >
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          )}
-          {subscribeError && (
-            <p className="text-[10px] text-red-400 font-mono uppercase tracking-widest">
-              {subscribeError}
-            </p>
-          )}
-        </div>
-
+        </section>
       </div>
 
-      <div className="mx-auto max-w-7xl border-t border-white/5 mt-16 pt-8 flex flex-col md:flex-row items-center justify-between gap-6">
-        <p 
-          className="text-[10px] font-mono tracking-widest text-neutral-600 uppercase text-center md:text-left cursor-pointer"
-          onDoubleClick={() => setView('god')}
-          title="StevenBmj Authenticity"
-        >
-          {settings?.footerCredits ? (
-            language === 'FR' ? settings.footerCredits : settings.footerCreditsEn
-          ) : (
-            `© ${new Date().getFullYear()} STEVENBMJ HAUTE COUTURE. ${language === 'FR' ? 'TOUS DROITS RÉSERVÉS' : 'ALL RIGHTS RESERVED'}.`
-          )}
-        </p>
-        <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 md:gap-6 text-[10px] font-mono text-neutral-600 tracking-wider">
-          <button 
-            onClick={() => setActivePolicy('privacy')}
-            className="hover:text-amber-400 duration-300 cursor-pointer uppercase"
-          >
-            {language === 'FR' ? 'Politique de confidentialité' : 'Privacy Policy'}
-          </button>
-          <button 
-            onClick={() => setActivePolicy('cgv')}
-            className="hover:text-amber-400 duration-300 cursor-pointer uppercase"
-          >
-            {language === 'FR' ? 'CGV' : 'Terms of Sale (CGV)'}
-          </button>
-          <button 
-            onClick={() => setActivePolicy('legal')}
-            className="hover:text-amber-400 duration-300 cursor-pointer uppercase"
-          >
-            {language === 'FR' ? 'Mentions légales' : 'Legal Notice'}
-          </button>
-        </div>
+      <nav aria-label="Navigation" className="min-w-0">
+        <h2 className={headingClass}>Navigation</h2>
+        <ul>
+          {[{ view: 'home', href: '/', label: fr ? 'Accueil' : 'Home' },
+            { view: 'boutique', href: '/boutique', label: fr ? 'Boutique' : 'Shop' },
+            { view: 'aide', href: '/aide', label: 'Services' },
+            { view: 'about', href: '/about', label: fr ? 'À propos de StevenBmj' : 'About StevenBmj' },
+          ].map(item => <li key={item.view}><a href={item.href} onClick={event => go(event, item.view)} className={linkClass}>{item.label}</a></li>)}
+          <li><a href="/aide#faq" className={linkClass}>FAQ</a></li>
+        </ul>
+      </nav>
+
+      <nav aria-label={fr ? 'Compte' : 'Account'} className="min-w-0">
+        <h2 className={headingClass}>{fr ? 'Compte' : 'Account'}</h2>
+        <ul>
+          {user ? <>
+            <li><a href="/compte" onClick={event => go(event, 'account')} className={linkClass}>{fr ? 'Mes commandes' : 'My orders'}</a></li>
+            <li><button type="button" onClick={() => setCartOpen(true)} className={linkClass}>{fr ? 'Mon panier' : 'My cart'}</button></li>
+            {user.isAdmin && <li><a href="/god" onClick={event => go(event, 'god')} className={linkClass}>Administration</a></li>}
+          </> : <>
+            <li><button type="button" disabled={authLoading} onClick={() => openAuth('login')} className={`${linkClass} disabled:opacity-50`}>{fr ? 'Connexion' : 'Sign in'}</button></li>
+            <li><button type="button" disabled={authLoading} onClick={() => openAuth('register')} className={`${linkClass} disabled:opacity-50`}>{fr ? 'Inscription' : 'Register'}</button></li>
+          </>}
+          <li><a href="/aide" onClick={event => go(event, 'aide')} className={linkClass}>Support</a></li>
+          <li><a href="/livraisons" onClick={event => go(event, 'driver')} className={linkClass}>{fr ? 'Espace livreur' : 'Driver workspace'}</a></li>
+        </ul>
+      </nav>
+
+      <nav aria-label={fr ? 'Informations légales' : 'Legal Information'} className="col-span-2 min-w-0 sm:col-span-1">
+        <h2 className={headingClass}>{fr ? 'Informations légales' : 'Legal Information'}</h2>
+        <ul>{policyOrder.map(id => <li key={id}><button type="button" onClick={() => setActivePolicy(id)} className={linkClass}>{policies[id].label}</button></li>)}</ul>
+      </nav>
+    </div>
+
+    <div className="mx-auto mt-12 max-w-7xl border-t border-white/10 pt-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <p onDoubleClick={() => setView('god')} className="break-words text-xs leading-6 text-neutral-400">{copyright}</p>
+        <nav aria-label={fr ? 'Raccourcis légaux' : 'Legal shortcuts'} className="flex flex-wrap gap-x-5 gap-y-1">
+          {policyOrder.map(id => <button key={id} type="button" onClick={() => setActivePolicy(id)}
+            className="min-h-11 text-left text-xs leading-5 text-neutral-400 hover:text-amber-400 focus-visible:outline-2 focus-visible:outline-amber-400">{policies[id].label}</button>)}
+        </nav>
       </div>
-      <p className="mt-6 text-center text-xs text-neutral-400">{language === 'FR' ? 'Réalisé par StevenBmj' : 'Built by StevenBmj'}</p>
-
-      {/* RENDER DYNAMIC POLICY MODAL FOR COUTURE COMPLIANCE */}
-      {activePolicy && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md transition-all duration-300">
-          <div className="relative w-full max-w-2xl bg-neutral-950 border border-white/10 rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] text-left">
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
-              <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase">MAISON STEVENBMJ • DOCUMENT OFFICIEL</span>
-              <button 
-                onClick={() => setActivePolicy(null)}
-                className="text-neutral-400 hover:text-white font-mono text-xs cursor-pointer border border-white/10 px-2.5 py-1 rounded bg-neutral-900 duration-300 hover:border-amber-400"
-              >
-                [ FERMER / CLOSE ]
-              </button>
-            </div>
-
-            <div className="p-6 sm:p-8 overflow-y-auto space-y-6 text-xs text-neutral-300 leading-relaxed font-light scrollbar-thin scrollbar-thumb-neutral-800">
-              
-              {activePolicy === 'privacy' && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-light text-white tracking-widest uppercase font-sans border-b border-white/5 pb-2">
-                    {language === 'FR' ? "POLITIQUE DE CONFIDENTIALITÉ" : "PRIVACY POLICY"}
-                  </h2>
-                  <p className="font-mono text-amber-500 text-[10px] uppercase tracking-wider">Mise à jour : Mai 2026 • Cotonou, République du Bénin</p>
-                  
-                  <div className="space-y-3">
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">1. Protection Souveraine des Données</h3>
-                    <p>
-                      {language === 'FR' 
-                        ? "La Maison StevenBmj s'engage à garantir le plus haut niveau de secret professionnel pour l'élite de ses VIP. Toutes vos données d'atelier (mensurations, carnets de commandes de prestige, adresses) sont chiffrées de bout en bout et conservées au sein de serveurs hautement sécurisés protégés par notre Cyber Pare-Feu."
-                        : "Maison StevenBmj is bound to preserve the absolute secret regarding our elite VIP clients' data. All tailoring notes (measurements, prestige order books, addresses) are encrypted end-to-end and stored in bulletproof servers secured by our sovereign hardware firewall."}
-                    </p>
-
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">2. Collecte & Utilisation Légitime</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "Nous collectons uniquement les informations nécessaires au façonnage de vos silhouettes sur-mesure (Mocassins à semelles crêpe, costumes croisés, diamants et horlogerie royale) et aux communications confidentielles de notre secrétariat. Vos données ne sont jamais partagées, vendues ou cédées à des tiers."
-                        : "We solely collect executive information critical to designing and delivering custom wear (Crepe loafers, double-breasted suits, fine custom jewelry and watches) and maintaining direct, quiet communication with our concierge desk. Your archives will never be sold or made accessible to third parties."}
-                    </p>
-
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">3. Sécurisation & Contrôle Logiciel</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "Toute transaction financière ou modification de profil requiert une authentification forte par courriel. Notre système logiciel s'appuie sur le respect d'une hygiène informatique stricte interdisant les injections ou le tracking publicitaire."
-                        : "Profile modifications and premium collections requests require strict authentication codes dispatched to your registered email to enforce secure digital handshakes and mitigate unauthorized access."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activePolicy === 'cgv' && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-light text-white tracking-widest uppercase font-sans border-b border-white/5 pb-2">
-                    {language === 'FR' ? "CONDITIONS GÉNÉRALES DE VENTE (CGV)" : "TERMS OF SALE & COUTURE CONDITIONS"}
-                  </h2>
-                  <p className="font-mono text-amber-500 text-[10px] uppercase tracking-wider">Mise à jour : Mai 2026 • Salons Cotonou</p>
-                  
-                  <div className="space-y-3">
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">1. Portée des Créations & Sur-Mesure</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "Les souliers de caractère en semelle gomme crêpe naturelle d'Italie et les costumes en laine extra-fine mérinos sont taillés spécifiquement selon les mesures indiquées par l'acheteur. En raison du caractère hautement personnalisé de nos pièces de couture, aucun retour ou annulation ne peut être accepté après la découpe des étoffes en atelier."
-                        : "The character loafers in natural crepe rubber and merino suits are cut exclusively for the customer's personal silhouette. Due to the bespoke parameters of custom items, no return or refund is permitted once fabric cutting begins."}
-                    </p>
-
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">2. Expédition & Logistique Diplomatique</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "StevenBmj expédie ses coffrets de prestige depuis son atelier de Cotonou, Bénin vers le monde entier par transporteur blindé sécurisé (DHL Express / FedEx Priority). Les droits de douane et taxes d'importation restent à la charge du client d'élite."
-                        : "All prestige orders are dispatched from our Akpakpa Salon in Cotonou, Benin, to international capitals using high-security diplomatic shipping partners. Customs duties remain the sole responsibility of the buyer."}
-                    </p>
-
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">3. Attribution des Pièces Horlogères</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "L'achat d'un chronographe d'exception royale ou d'une pièce d'orfèvrerie fine en or 18k est réservé aux membres dont l'identité numérique est préalablement vérifiée et validée par e-mail professionnel."
-                        : "Royale chronographs and 18k jewelry are strictly limited. Orders are processed only after professional email verification to counter fraud and guarantee authenticity."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activePolicy === 'legal' && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-light text-white tracking-widest uppercase font-sans border-b border-white/5 pb-2">
-                    {language === 'FR' ? "MENTIONS LÉGALES" : "LEGAL NOTICE"}
-                  </h2>
-                  <p className="font-mono text-amber-500 text-[10px] uppercase tracking-wider">Maison StevenBmj</p>
-                  
-                  <div className="space-y-3">
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">Éditeur du Site & Propriété</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "La marque et le service en ligne 'StevenBmj' sont édités par l'Atelier de Couture et Orfèvrerie de Prestige StevenBmj."
-                        : "The 'StevenBmj' trademark and luxury boutique are edited and managed by the Atelier de Couture et Orfèvrerie de Prestige StevenBmj."}
-                    </p>
-                    <p>
-                      <strong>{language === 'FR' ? "Siège social :" : "Physical Showroom:"}</strong> Avenue du Prestige, Quartier Akpakpa, Cotonou, République du Bénin.<br />
-                      <strong>{language === 'FR' ? "PDG de StevenBmj :" : "StevenBmj CEO:"}</strong> AMORIN Steven A . S<br />
-                      <strong>{language === 'FR' ? "Directeur de la Publication :" : "Director of Publication:"}</strong> AMORIN Steven A . S<br />
-                      <strong>Contacts :</strong> +229 01 55 46 8138 / 01 44 15 80 44<br />
-                      <strong>Email :</strong> <span className="text-amber-400 font-mono">stevenbmj202@gmail.com</span>
-                    </p>
-
-                    <h3 className="font-mono text-[10px] text-white uppercase tracking-widest">{language === 'FR' ? 'Hébergement' : 'Hosting'}</h3>
-                    <p>
-                      {language === 'FR'
-                        ? "Le site est hébergé sur Vercel. Les données sont stockées dans le projet Supabase de StevenBmj."
-                        : "The site is hosted on Vercel. Data is stored in StevenBmj’s Supabase project."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            <div className="p-4 border-t border-white/5 bg-neutral-900/60 text-center text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
-              MAISON STEVENBMJ • EXCELLENCE SANS COMPROMIS
-            </div>
-          </div>
-        </div>
-      )}
-    </footer>
-  );
+      <p className="mt-5 text-center text-xs leading-6 text-neutral-400">{fr ? 'Réalisé par StevenBmj' : 'Built by StevenBmj'}</p>
+    </div>
+    {activePolicy && <FooterPolicyDialog policy={activePolicy} language={language} onDismiss={() => setActivePolicy(null)} />}
+  </footer>;
 }
